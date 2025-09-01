@@ -345,6 +345,7 @@
         let users = [];
         let progress = {};
         let collapsedSections = {};
+        let editingActivity = null;
         
         let activities = [
             { id: 1, name: 'Morning Exercise', icon: '🏃‍♂️', timeOfDay: 'morning' },
@@ -464,6 +465,64 @@
             if (!progress[day]) progress[day] = {};
             progress[day][activityId] = !progress[day][activityId];
             renderAll();
+        }
+
+        function getCurrentStreak(activityId) {
+            let streak = 0;
+            for (let day = currentDay; day >= 1; day--) {
+                if (isCompleted(day, activityId)) {
+                    streak++;
+                } else {
+                    break;
+                }
+            }
+            return streak;
+        }
+
+        function getLongestStreak(activityId) {
+            let maxStreak = 0;
+            let currentStreak = 0;
+            
+            for (let day = 1; day <= 40; day++) {
+                if (isCompleted(day, activityId)) {
+                    currentStreak++;
+                    maxStreak = Math.max(maxStreak, currentStreak);
+                } else {
+                    currentStreak = 0;
+                }
+            }
+            return maxStreak;
+        }
+
+        function getCompletionRate(activityId) {
+            let completed = 0;
+            for (let day = 1; day <= currentDay; day++) {
+                if (isCompleted(day, activityId)) completed++;
+            }
+            return currentDay > 0 ? Math.round((completed / currentDay) * 100) : 0;
+        }
+
+        function startEditingActivity(activityId) {
+            editingActivity = activityId;
+            renderAll();
+            // Focus the input after render
+            setTimeout(() => {
+                const input = document.querySelector(`#edit-name-${activityId}`);
+                if (input) input.focus();
+            }, 100);
+        }
+
+        function stopEditingActivity() {
+            editingActivity = null;
+            renderAll();
+        }
+
+        function updateActivityInline(activityId, field, value) {
+            const activityIndex = activities.findIndex(a => a.id === activityId);
+            if (activityIndex !== -1) {
+                activities[activityIndex][field] = value;
+                renderAll();
+            }
         }
 
         function addActivity() {
@@ -701,34 +760,78 @@
                     } else {
                         sectionActivities.forEach(activity => {
                             const completed = isCompleted(currentDay, activity.id);
+                            const streak = getCurrentStreak(activity.id);
+                            const completionRate = getCompletionRate(activity.id);
                             const activityDiv = document.createElement('div');
                             activityDiv.className = `relative p-4 rounded-xl card-hover cursor-pointer border-2 transition-all ${completed ? 'border-green-300 bg-green-50' : 'border-gray-200 bg-white'} ${!isAuthenticated ? 'opacity-60' : ''}`;
-                            activityDiv.onclick = () => !editMode && toggleActivity(currentDay, activity.id);
                             
                             // Add blur overlay for non-authenticated users
                             const overlayHtml = !isAuthenticated ? `
                                 <div class="absolute inset-0 bg-white bg-opacity-50 blur-overlay rounded-xl"></div>
                             ` : '';
                             
-                            activityDiv.innerHTML = `
-                                ${overlayHtml}
-                                <div class="flex items-center justify-between">
-                                    <div class="flex items-center space-x-4">
-                                        <div class="w-12 h-12 bg-gradient-to-r from-blue-400 to-blue-600 rounded-full flex items-center justify-center text-white text-xl shadow-lg">
-                                            ${activity.icon}
+                            // Handle inline editing or normal display
+                            if (editingActivity === activity.id) {
+                                activityDiv.innerHTML = `
+                                    ${overlayHtml}
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center space-x-4 flex-1">
+                                            <div class="w-12 h-12 bg-gradient-to-r from-blue-400 to-blue-600 rounded-full flex items-center justify-center text-white text-xl shadow-lg">
+                                                <select id="edit-icon-${activity.id}" onchange="updateActivityInline(${activity.id}, 'icon', this.value)" class="bg-transparent text-white text-xl border-none outline-none cursor-pointer">
+                                                    <option value="✨">✨</option>
+                                                    <option value="🏃‍♂️" ${activity.icon === '🏃‍♂️' ? 'selected' : ''}>🏃‍♂️</option>
+                                                    <option value="📚" ${activity.icon === '📚' ? 'selected' : ''}>📚</option>
+                                                    <option value="🧘‍♀️" ${activity.icon === '🧘‍♀️' ? 'selected' : ''}>🧘‍♀️</option>
+                                                    <option value="💧" ${activity.icon === '💧' ? 'selected' : ''}>💧</option>
+                                                    <option value="✍️" ${activity.icon === '✍️' ? 'selected' : ''}>✍️</option>
+                                                    <option value="🍎" ${activity.icon === '🍎' ? 'selected' : ''}>🍎</option>
+                                                    <option value="💪" ${activity.icon === '💪' ? 'selected' : ''}>💪</option>
+                                                    <option value="☀️" ${activity.icon === '☀️' ? 'selected' : ''}>☀️</option>
+                                                    <option value="🌙" ${activity.icon === '🌙' ? 'selected' : ''}>🌙</option>
+                                                </select>
+                                            </div>
+                                            <div class="flex-1">
+                                                <input id="edit-name-${activity.id}" type="text" value="${activity.name}" onchange="updateActivityInline(${activity.id}, 'name', this.value)" onkeypress="if(event.key==='Enter') stopEditingActivity()" class="font-medium text-gray-800 bg-transparent border-b-2 border-blue-400 focus:outline-none focus:border-blue-600 w-full">
+                                                <div class="text-xs text-blue-600 mt-1">Press Enter to save</div>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <h3 class="font-medium text-gray-800">${activity.name}</h3>
+                                        <button onclick="stopEditingActivity()" class="px-3 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200 text-sm">
+                                            ✓ Save
+                                        </button>
+                                    </div>
+                                `;
+                            } else {
+                                activityDiv.onclick = () => !editMode && toggleActivity(currentDay, activity.id);
+                                activityDiv.innerHTML = `
+                                    ${overlayHtml}
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center space-x-4">
+                                            <div class="w-12 h-12 bg-gradient-to-r from-blue-400 to-blue-600 rounded-full flex items-center justify-center text-white text-xl shadow-lg ${editMode ? 'cursor-pointer hover:scale-105 transition-transform' : ''}" ${editMode ? `onclick="event.stopPropagation(); startEditingActivity(${activity.id})"` : ''}>
+                                                ${activity.icon}
+                                            </div>
+                                            <div ${editMode ? `onclick="event.stopPropagation(); startEditingActivity(${activity.id})" class="cursor-pointer hover:bg-blue-50 px-2 py-1 rounded transition-colors"` : ''}>
+                                                <h3 class="font-medium text-gray-800 ${editMode ? 'hover:text-blue-600' : ''}">${activity.name}</h3>
+                                                ${streak > 0 ? `
+                                                    <div class="flex items-center space-x-1 text-sm text-orange-600 mt-1">
+                                                        <span class="text-base">🔥</span>
+                                                        <span class="font-semibold">${streak} day streak!</span>
+                                                    </div>
+                                                ` : ''}
+                                                ${completionRate > 0 ? `
+                                                    <div class="text-xs text-gray-500 mt-1">${completionRate}% completion rate</div>
+                                                ` : ''}
+                                                ${editMode ? '<div class="text-xs text-blue-500 mt-1">Click to edit</div>' : ''}
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center space-x-3">
+                                            ${completed ? 
+                                                '<div class="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-white bounce-in shadow-lg">✓</div>' :
+                                                '<div class="w-8 h-8 border-2 border-gray-300 rounded-full hover:border-gray-400 transition-colors"></div>'
+                                            }
                                         </div>
                                     </div>
-                                    <div class="flex items-center space-x-3">
-                                        ${completed ? 
-                                            '<div class="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-white bounce-in shadow-lg">✓</div>' :
-                                            '<div class="w-8 h-8 border-2 border-gray-300 rounded-full hover:border-gray-400 transition-colors"></div>'
-                                        }
-                                    </div>
-                                </div>
-                            `;
+                                `;
+                            }
                             
                             activitiesDiv.appendChild(activityDiv);
                         });
@@ -764,16 +867,52 @@
         function renderEditPanel() {
             if (!editMode) return;
             
-            // Update stats
+            // Update stats with enhanced analytics
             const statsDiv = document.getElementById('activity-stats');
+            const totalActivities = activities.length;
+            const morningCount = activities.filter(a => a.timeOfDay === 'morning').length;
+            const middayCount = activities.filter(a => a.timeOfDay === 'midday').length;
+            const eveningCount = activities.filter(a => a.timeOfDay === 'evening').length;
+            
+            // Calculate overall completion rate
+            let totalPossible = 0;
+            let totalCompleted = 0;
+            activities.forEach(activity => {
+                for (let day = 1; day <= currentDay; day++) {
+                    totalPossible++;
+                    if (isCompleted(day, activity.id)) totalCompleted++;
+                }
+            });
+            const overallRate = totalPossible > 0 ? Math.round((totalCompleted / totalPossible) * 100) : 0;
+            
             statsDiv.innerHTML = `
-                <div class="flex justify-between"><span class="text-gray-600">Total:</span><span class="font-medium">${activities.length}</span></div>
-                <div class="flex justify-between"><span class="text-gray-600">Morning:</span><span class="font-medium">${activities.filter(a => a.timeOfDay === 'morning').length}</span></div>
-                <div class="flex justify-between"><span class="text-gray-600">Mid-day:</span><span class="font-medium">${activities.filter(a => a.timeOfDay === 'midday').length}</span></div>
-                <div class="flex justify-between"><span class="text-gray-600">Evening:</span><span class="font-medium">${activities.filter(a => a.timeOfDay === 'evening').length}</span></div>
+                <div class="space-y-2">
+                    <div class="flex justify-between items-center p-2 bg-purple-50 rounded">
+                        <span class="text-gray-700 font-medium">Total Activities:</span>
+                        <span class="font-bold text-purple-600">${totalActivities}</span>
+                    </div>
+                    <div class="grid grid-cols-3 gap-1 text-xs">
+                        <div class="text-center p-2 bg-orange-50 rounded">
+                            <div class="font-semibold text-orange-600">${morningCount}</div>
+                            <div class="text-orange-500">🌅 Morning</div>
+                        </div>
+                        <div class="text-center p-2 bg-yellow-50 rounded">
+                            <div class="font-semibold text-yellow-600">${middayCount}</div>
+                            <div class="text-yellow-500">☀️ Mid-day</div>
+                        </div>
+                        <div class="text-center p-2 bg-indigo-50 rounded">
+                            <div class="font-semibold text-indigo-600">${eveningCount}</div>
+                            <div class="text-indigo-500">🌙 Evening</div>
+                        </div>
+                    </div>
+                    <div class="flex justify-between items-center p-2 bg-green-50 rounded">
+                        <span class="text-gray-700 font-medium">Overall Rate:</span>
+                        <span class="font-bold text-green-600">${overallRate}%</span>
+                    </div>
+                </div>
             `;
             
-            // Update activities list
+            // Update activities list with enhanced management
             const listDiv = document.getElementById('edit-activities-list');
             listDiv.innerHTML = '';
             
@@ -783,10 +922,15 @@
                 const timeDiv = document.createElement('div');
                 timeDiv.className = 'mb-6';
                 timeDiv.innerHTML = `
-                    <div class="flex items-center space-x-2 mb-3 pb-2 border-b border-gray-200">
-                        <span class="text-lg">${timeOption.icon}</span>
-                        <h4 class="font-medium text-gray-700">${timeOption.label}</h4>
-                        <span class="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">${sectionActivities.length} activities</span>
+                    <div class="flex items-center justify-between mb-3 pb-2 border-b border-gray-200">
+                        <div class="flex items-center space-x-2">
+                            <span class="text-lg">${timeOption.icon}</span>
+                            <h4 class="font-semibold text-gray-700">${timeOption.label}</h4>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <span class="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded font-medium">${sectionActivities.length} activities</span>
+                            ${sectionActivities.length > 0 ? `<span class="text-xs text-green-600 bg-green-100 px-2 py-1 rounded font-medium">${Math.round((sectionActivities.reduce((sum, a) => sum + getCompletionRate(a.id), 0) / sectionActivities.length) || 0)}% avg</span>` : ''}
+                        </div>
                     </div>
                 `;
                 
@@ -796,26 +940,42 @@
                 if (sectionActivities.length === 0) {
                     activitiesContainer.innerHTML = `
                         <div class="text-center py-8 text-gray-400 border-2 border-dashed border-gray-200 rounded-lg">
+                            <div class="text-2xl mb-2">${timeOption.icon}</div>
                             <p class="text-sm">No ${timeOption.label.toLowerCase()} activities</p>
+                            <p class="text-xs">Add activities using the form on the left</p>
                         </div>
                     `;
                 } else {
                     sectionActivities.forEach((activity, index) => {
+                        const streak = getCurrentStreak(activity.id);
+                        const longestStreak = getLongestStreak(activity.id);
+                        const completionRate = getCompletionRate(activity.id);
+                        
                         const activityDiv = document.createElement('div');
-                        activityDiv.className = 'flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg hover:border-gray-300';
+                        activityDiv.className = 'p-3 bg-white border border-gray-200 rounded-lg hover:border-gray-300 shadow-sm hover:shadow transition-all';
                         activityDiv.innerHTML = `
-                            <div class="flex items-center space-x-3">
-                                <span class="text-xl">${activity.icon}</span>
-                                <span class="font-medium text-gray-800">${activity.name}</span>
-                            </div>
-                            <div class="flex items-center space-x-1">
-                                ${timeOptions.filter(t => t.value !== activity.timeOfDay).map(t => 
-                                    `<button onclick="moveToSection(${activity.id}, '${t.value}')" class="p-1 text-blue-500 hover:bg-blue-50 rounded" title="Move to ${t.label}">${t.icon}</button>`
-                                ).join('')}
-                                <div class="border-l border-gray-200 pl-2 ml-2 flex space-x-1">
-                                    <button onclick="moveActivity(${activity.id}, 'up')" ${index === 0 ? 'disabled' : ''} class="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30">⬆️</button>
-                                    <button onclick="moveActivity(${activity.id}, 'down')" ${index === sectionActivities.length - 1 ? 'disabled' : ''} class="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30">⬇️</button>
-                                    <button onclick="deleteActivity(${activity.id})" class="p-1 text-red-500 hover:bg-red-50 rounded">❌</button>
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center space-x-3 flex-1">
+                                    <span class="text-xl">${activity.icon}</span>
+                                    <div class="flex-1">
+                                        <span class="font-medium text-gray-800">${activity.name}</span>
+                                        <div class="flex items-center space-x-3 mt-1">
+                                            ${streak > 0 ? `<span class="text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded flex items-center space-x-1"><span>🔥</span><span>${streak}</span></span>` : ''}
+                                            ${longestStreak > 0 ? `<span class="text-xs text-purple-600 bg-purple-50 px-2 py-1 rounded">Best: ${longestStreak}</span>` : ''}
+                                            ${completionRate > 0 ? `<span class="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">${completionRate}%</span>` : ''}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="flex items-center space-x-1">
+                                    ${timeOptions.filter(t => t.value !== activity.timeOfDay).map(t => 
+                                        `<button onclick="moveToSection(${activity.id}, '${t.value}')" class="p-1.5 text-blue-500 hover:bg-blue-50 rounded transition-colors" title="Move to ${t.label}">${t.icon}</button>`
+                                    ).join('')}
+                                    <div class="border-l border-gray-200 pl-2 ml-2 flex space-x-1">
+                                        <button onclick="moveActivity(${activity.id}, 'up')" ${index === 0 ? 'disabled' : ''} class="p-1.5 text-gray-400 hover:text-gray-600 disabled:opacity-30 hover:bg-gray-50 rounded transition-colors" title="Move up">⬆️</button>
+                                        <button onclick="moveActivity(${activity.id}, 'down')" ${index === sectionActivities.length - 1 ? 'disabled' : ''} class="p-1.5 text-gray-400 hover:text-gray-600 disabled:opacity-30 hover:bg-gray-50 rounded transition-colors" title="Move down">⬇️</button>
+                                        <button onclick="startEditingActivity(${activity.id})" class="p-1.5 text-blue-500 hover:bg-blue-50 rounded transition-colors" title="Edit details">✏️</button>
+                                        <button onclick="deleteActivity(${activity.id})" class="p-1.5 text-red-500 hover:bg-red-50 rounded transition-colors" title="Delete activity">❌</button>
+                                    </div>
                                 </div>
                             </div>
                         `;
