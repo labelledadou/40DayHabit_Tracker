@@ -6,974 +6,836 @@
     <title>40-Day Habit Tracker</title>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        .animate-bounce {
-            animation: bounce 1s infinite;
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         }
-        @keyframes bounce {
-            0%, 20%, 53%, 80%, 100% { transform: translate3d(0,0,0); }
-            40%, 43% { transform: translate3d(0,-30px,0); }
-            70% { transform: translate3d(0,-15px,0); }
-            90% { transform: translate3d(0,-4px,0); }
+        .card-hover {
+            transition: all 0.3s ease;
         }
-        .animate-pulse {
-            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        .card-hover:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+        .pulse-animation {
+            animation: pulse 2s infinite;
         }
         @keyframes pulse {
             0%, 100% { opacity: 1; }
-            50% { opacity: .5; }
+            50% { opacity: 0.7; }
         }
-        .blur-interaction {
-            position: relative;
+        .bounce-in {
+            animation: bounceIn 0.6s ease-out;
         }
-        .blur-interaction::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(255, 255, 255, 0.8);
-            backdrop-filter: blur(2px);
-            z-index: 10;
+        @keyframes bounceIn {
+            0% { transform: scale(0.3); opacity: 0; }
+            50% { transform: scale(1.05); }
+            70% { transform: scale(0.9); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .celebration {
+            animation: celebration 1s ease-out;
+        }
+        @keyframes celebration {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        .blur-overlay {
+            backdrop-filter: blur(4px);
         }
     </style>
 </head>
 <body>
-    <div id="loading" style="display: flex; justify-content: center; align-items: center; height: 100vh; font-size: 24px;">
-        Loading your habit tracker... ⏳
+    <div id="root">
+        <div class="min-h-screen gradient-bg flex items-center justify-center p-4">
+            <div class="bg-white rounded-lg p-8 text-center">
+                <div class="animate-spin w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+                <p class="text-gray-600">Building your personalized habit tracker... ⏳</p>
+            </div>
+        </div>
     </div>
-    <div id="root"></div>
 
-    <script>
-        function initializeApp() {
-            if (typeof React === 'undefined' || typeof ReactDOM === 'undefined') {
-                setTimeout(initializeApp, 100);
-                return;
-            }
+    <script type="text/babel">
+        const { useState, useEffect } = React;
 
-            document.getElementById('loading').style.display = 'none';
-            document.getElementById('root').style.display = 'block';
+        const HabitTracker = () => {
+            // Authentication state
+            const [isAuthenticated, setIsAuthenticated] = useState(false);
+            const [currentUser, setCurrentUser] = useState(null);
+            const [showAuthModal, setShowAuthModal] = useState(false);
+            const [authMode, setAuthMode] = useState('login'); // 'login' or 'register'
+            const [authForm, setAuthForm] = useState({ email: '', password: '', name: '' });
 
-            const { useState, useEffect } = React;
-            const { createElement: h } = React;
+            // App state
+            const [currentDay, setCurrentDay] = useState(1);
+            const [activities, setActivities] = useState([
+                { id: 1, name: 'Morning Exercise', icon: '🏃‍♂️', color: 'bg-gradient-to-r from-blue-400 to-blue-600' },
+                { id: 2, name: 'Read 30 Minutes', icon: '📚', color: 'bg-gradient-to-r from-green-400 to-green-600' },
+                { id: 3, name: 'Meditate', icon: '🧘‍♀️', color: 'bg-gradient-to-r from-purple-400 to-purple-600' },
+                { id: 4, name: 'Drink 8 Glasses Water', icon: '💧', color: 'bg-gradient-to-r from-cyan-400 to-cyan-600' },
+                { id: 5, name: 'Journal', icon: '✍️', color: 'bg-gradient-to-r from-amber-400 to-amber-600' }
+            ]);
 
-            function HabitTracker() {
-                // Authentication state
-                const [isAuthenticated, setIsAuthenticated] = useState(false);
-                const [currentUser, setCurrentUser] = useState(null);
-                const [showAuthModal, setShowAuthModal] = useState(false);
-                const [authMode, setAuthMode] = useState('login'); // 'login' or 'register'
-                const [authForm, setAuthForm] = useState({ email: '', password: '', confirmPassword: '' });
+            // Progress tracking
+            const [progress, setProgress] = useState({});
+            const [editMode, setEditMode] = useState(false);
+            const [newActivity, setNewActivity] = useState({ name: '', icon: '✨' });
+            const [editingActivity, setEditingActivity] = useState(null);
+            const [showDemoMessage, setShowDemoMessage] = useState(false);
 
-                // App state (only active when authenticated)
-                const [currentDay, setCurrentDay] = useState(1);
-                const [activities, setActivities] = useState([
-                    { id: 1, name: 'Morning Exercise', color: 'from-blue-400 to-blue-600', icon: '🏃‍♂️' },
-                    { id: 2, name: 'Read 30 Minutes', color: 'from-green-400 to-green-600', icon: '📚' },
-                    { id: 3, name: 'Meditate', color: 'from-purple-400 to-purple-600', icon: '🧘‍♀️' },
-                    { id: 4, name: 'Drink 8 Glasses Water', color: 'from-cyan-400 to-cyan-600', icon: '💧' },
-                    { id: 5, name: 'Journal', color: 'from-orange-400 to-orange-600', icon: '✍️' }
-                ]);
-                
-                const [completedActivities, setCompletedActivities] = useState({});
-                const [showCelebration, setShowCelebration] = useState(false);
-                const [isEditingActivities, setIsEditingActivities] = useState(false);
-                const [newActivity, setNewActivity] = useState({ name: '', icon: '✨' });
-                const [editingActivity, setEditingActivity] = useState(null);
-                
-                // Supabase state
-                const [supabaseUrl, setSupabaseUrl] = useState('');
-                const [supabaseKey, setSupabaseKey] = useState('');
-                const [userId, setUserId] = useState('');
-                const [isConnected, setIsConnected] = useState(false);
-                const [showSupabaseSetup, setShowSupabaseSetup] = useState(false);
+            // Cloud sync
+            const [isCloudConnected, setIsCloudConnected] = useState(false);
+            const [showCloudSetup, setShowCloudSetup] = useState(false);
+            const [cloudConfig, setCloudConfig] = useState({ url: '', key: '', userId: '' });
 
-                // Check for saved authentication on load
-                useEffect(() => {
-                    const savedAuth = localStorage.getItem('habitTrackerAuth');
-                    if (savedAuth) {
-                        const authData = JSON.parse(savedAuth);
+            // Demo users storage
+            const [users, setUsers] = useState([]);
+
+            const iconOptions = ['✨', '🏃‍♂️', '📚', '🧘‍♀️', '💧', '✍️', '🍎', '💪', '🎯', '🌱', '🎵', '🔥', '⭐', '🚀', '💝'];
+            const colorOptions = [
+                'bg-gradient-to-r from-blue-400 to-blue-600',
+                'bg-gradient-to-r from-green-400 to-green-600',
+                'bg-gradient-to-r from-purple-400 to-purple-600',
+                'bg-gradient-to-r from-pink-400 to-pink-600',
+                'bg-gradient-to-r from-amber-400 to-amber-600',
+                'bg-gradient-to-r from-cyan-400 to-cyan-600',
+                'bg-gradient-to-r from-red-400 to-red-600',
+                'bg-gradient-to-r from-indigo-400 to-indigo-600'
+            ];
+
+            // Mock authentication
+            const handleAuth = (e) => {
+                e.preventDefault();
+                if (authMode === 'register') {
+                    const newUser = {
+                        id: Date.now(),
+                        email: authForm.email,
+                        name: authForm.name,
+                        activities: [...activities],
+                        progress: {},
+                        currentDay: 1
+                    };
+                    setUsers([...users, newUser]);
+                    setCurrentUser(newUser);
+                    setIsAuthenticated(true);
+                } else {
+                    // Login - find existing user
+                    const existingUser = users.find(u => u.email === authForm.email);
+                    if (existingUser) {
+                        setCurrentUser(existingUser);
+                        setActivities(existingUser.activities);
+                        setProgress(existingUser.progress);
+                        setCurrentDay(existingUser.currentDay);
                         setIsAuthenticated(true);
-                        setCurrentUser(authData.user);
-                        // Load user's data if available
-                        const savedData = localStorage.getItem(`habitTrackerData_${authData.user.email}`);
-                        if (savedData) {
-                            const userData = JSON.parse(savedData);
-                            setActivities(userData.activities || activities);
-                            setCompletedActivities(userData.completedActivities || {});
-                            setCurrentDay(userData.currentDay || 1);
-                        }
-                    }
-                }, []);
-
-                // Initialize completed activities structure
-                useEffect(() => {
-                    if (isAuthenticated) {
-                        const initialState = {};
-                        for (let day = 1; day <= 40; day++) {
-                            initialState[day] = {};
-                            activities.forEach(activity => {
-                                initialState[day][activity.id] = false;
-                            });
-                        }
-                        if (Object.keys(completedActivities).length === 0) {
-                            setCompletedActivities(initialState);
-                        }
-                    }
-                }, [isAuthenticated, activities]);
-
-                // Save data when authenticated and data changes
-                useEffect(() => {
-                    if (isAuthenticated && currentUser) {
-                        const userData = {
-                            activities,
-                            completedActivities,
-                            currentDay,
-                            lastUpdated: new Date().toISOString()
-                        };
-                        localStorage.setItem(`habitTrackerData_${currentUser.email}`, JSON.stringify(userData));
-                    }
-                }, [activities, completedActivities, currentDay, isAuthenticated, currentUser]);
-
-                const handleAuth = () => {
-                    if (authMode === 'login') {
-                        // Simple login (in real app, this would validate against a backend)
-                        if (authForm.email && authForm.password) {
-                            const user = { email: authForm.email, name: authForm.email.split('@')[0] };
-                            setCurrentUser(user);
-                            setIsAuthenticated(true);
-                            setShowAuthModal(false);
-                            setAuthForm({ email: '', password: '', confirmPassword: '' });
-                            
-                            // Save auth state
-                            localStorage.setItem('habitTrackerAuth', JSON.stringify({ user }));
-                        } else {
-                            alert('Please enter both email and password');
-                        }
                     } else {
-                        // Simple registration
-                        if (authForm.email && authForm.password && authForm.password === authForm.confirmPassword) {
-                            const user = { email: authForm.email, name: authForm.email.split('@')[0] };
-                            setCurrentUser(user);
-                            setIsAuthenticated(true);
-                            setShowAuthModal(false);
-                            setAuthForm({ email: '', password: '', confirmPassword: '' });
-                            
-                            // Save auth state
-                            localStorage.setItem('habitTrackerAuth', JSON.stringify({ user }));
-                        } else if (authForm.password !== authForm.confirmPassword) {
-                            alert('Passwords do not match');
-                        } else {
-                            alert('Please fill in all fields');
-                        }
-                    }
-                };
-
-                const handleLogout = () => {
-                    setIsAuthenticated(false);
-                    setCurrentUser(null);
-                    setActivities([
-                        { id: 1, name: 'Morning Exercise', color: 'from-blue-400 to-blue-600', icon: '🏃‍♂️' },
-                        { id: 2, name: 'Read 30 Minutes', color: 'from-green-400 to-green-600', icon: '📚' },
-                        { id: 3, name: 'Meditate', color: 'from-purple-400 to-purple-600', icon: '🧘‍♀️' },
-                        { id: 4, name: 'Drink 8 Glasses Water', color: 'from-cyan-400 to-cyan-600', icon: '💧' },
-                        { id: 5, name: 'Journal', color: 'from-orange-400 to-orange-600', icon: '✍️' }
-                    ]);
-                    setCompletedActivities({});
-                    setCurrentDay(1);
-                    localStorage.removeItem('habitTrackerAuth');
-                };
-
-                const showAuthPrompt = (mode) => {
-                    setAuthMode(mode);
-                    setShowAuthModal(true);
-                };
-
-                const toggleActivity = (dayNum, activityId) => {
-                    if (!isAuthenticated) {
-                        showAuthPrompt('login');
+                        alert('User not found. Please register first.');
                         return;
                     }
+                }
+                setShowAuthModal(false);
+                setAuthForm({ email: '', password: '', name: '' });
+            };
 
-                    setCompletedActivities(prev => ({
-                        ...prev,
-                        [dayNum]: {
-                            ...prev[dayNum],
-                            [activityId]: !prev[dayNum]?.[activityId]
+            const handleLogout = () => {
+                setIsAuthenticated(false);
+                setCurrentUser(null);
+                setProgress({});
+                setCurrentDay(1);
+                setActivities([
+                    { id: 1, name: 'Morning Exercise', icon: '🏃‍♂️', color: 'bg-gradient-to-r from-blue-400 to-blue-600' },
+                    { id: 2, name: 'Read 30 Minutes', icon: '📚', color: 'bg-gradient-to-r from-green-400 to-green-600' },
+                    { id: 3, name: 'Meditate', icon: '🧘‍♀️', color: 'bg-gradient-to-r from-purple-400 to-purple-600' },
+                    { id: 4, name: 'Drink 8 Glasses Water', icon: '💧', color: 'bg-gradient-to-r from-cyan-400 to-cyan-600' },
+                    { id: 5, name: 'Journal', icon: '✍️', color: 'bg-gradient-to-r from-amber-400 to-amber-600' }
+                ]);
+            };
+
+            const requireAuth = () => {
+                if (!isAuthenticated) {
+                    setShowDemoMessage(true);
+                    setTimeout(() => setShowDemoMessage(false), 3000);
+                    return false;
+                }
+                return true;
+            };
+
+            const isActivityCompleted = (day, activityId) => {
+                return progress[day]?.[activityId] || false;
+            };
+
+            const toggleActivity = (day, activityId) => {
+                if (!requireAuth()) return;
+                
+                setProgress(prev => ({
+                    ...prev,
+                    [day]: {
+                        ...prev[day],
+                        [activityId]: !prev[day]?.[activityId]
+                    }
+                }));
+            };
+
+            const getCompletionStats = () => {
+                let totalActivities = 0;
+                let completedActivities = 0;
+                
+                for (let day = 1; day <= 40; day++) {
+                    activities.forEach(activity => {
+                        totalActivities++;
+                        if (isActivityCompleted(day, activity.id)) {
+                            completedActivities++;
                         }
-                    }));
-
-                    const dayActivities = { ...completedActivities[dayNum] };
-                    dayActivities[activityId] = !dayActivities[activityId];
-                    const allCompleted = activities.every(activity => dayActivities[activity.id]);
-                    
-                    if (allCompleted && !completedActivities[dayNum]?.[activityId]) {
-                        setShowCelebration(true);
-                        setTimeout(() => setShowCelebration(false), 2000);
-                    }
+                    });
+                }
+                
+                return {
+                    completion: totalActivities > 0 ? Math.round((completedActivities / totalActivities) * 100) : 0,
+                    perfectDays: Array.from({length: 40}, (_, i) => i + 1).filter(day => 
+                        activities.every(activity => isActivityCompleted(day, activity.id))
+                    ).length
                 };
+            };
 
-                const getActivityStreak = (activityId) => {
-                    let streak = 0;
-                    for (let day = currentDay; day >= 1; day--) {
-                        if (completedActivities[day]?.[activityId]) {
-                            streak++;
-                        } else {
-                            break;
-                        }
+            const getCurrentStreak = (activityId) => {
+                let streak = 0;
+                for (let day = currentDay; day >= 1; day--) {
+                    if (isActivityCompleted(day, activityId)) {
+                        streak++;
+                    } else {
+                        break;
                     }
-                    return streak;
-                };
+                }
+                return streak;
+            };
 
-                const getTotalProgress = () => {
-                    let completed = 0;
-                    let total = 0;
-                    for (let day = 1; day <= 40; day++) {
-                        activities.forEach(activity => {
-                            total++;
-                            if (completedActivities[day]?.[activity.id]) {
-                                completed++;
-                            }
-                        });
-                    }
-                    return Math.round((completed / total) * 100);
-                };
-
-                const getDayProgress = (dayNum) => {
-                    if (!completedActivities[dayNum]) return 0;
-                    const completed = activities.filter(activity => completedActivities[dayNum][activity.id]).length;
-                    return Math.round((completed / activities.length) * 100);
-                };
-
-                const getCompletedDays = () => {
-                    let completedDays = 0;
-                    for (let day = 1; day <= 40; day++) {
-                        if (getDayProgress(day) === 100) {
-                            completedDays++;
-                        }
-                    }
-                    return completedDays;
-                };
-
-                const availableColors = [
-                    'from-blue-400 to-blue-600', 'from-green-400 to-green-600', 'from-purple-400 to-purple-600',
-                    'from-cyan-400 to-cyan-600', 'from-orange-400 to-orange-600', 'from-pink-400 to-pink-600',
-                    'from-red-400 to-red-600', 'from-indigo-400 to-indigo-600', 'from-yellow-400 to-yellow-600',
-                    'from-teal-400 to-teal-600'
-                ];
-
-                const availableIcons = ['✨', '🏃‍♂️', '📚', '🧘‍♀️', '💧', '✍️', '🍎', '💪', '🎯', '🌱', '🎵', '🔥', '⭐', '🚀', '💝'];
-
-                const addActivity = () => {
-                    if (!isAuthenticated) {
-                        showAuthPrompt('login');
-                        return;
-                    }
-                    if (!newActivity.name.trim()) return;
-                    
-                    const maxId = Math.max(...activities.map(a => a.id), 0);
-                    const newId = maxId + 1;
-                    const randomColor = availableColors[Math.floor(Math.random() * availableColors.length)];
-                    
-                    const activity = {
+            const addActivity = () => {
+                if (!requireAuth()) return;
+                if (newActivity.name.trim()) {
+                    const newId = Math.max(...activities.map(a => a.id), 0) + 1;
+                    const randomColor = colorOptions[Math.floor(Math.random() * colorOptions.length)];
+                    setActivities([...activities, {
                         id: newId,
-                        name: newActivity.name,
-                        color: randomColor,
-                        icon: newActivity.icon
-                    };
-
-                    setActivities([...activities, activity]);
+                        name: newActivity.name.trim(),
+                        icon: newActivity.icon,
+                        color: randomColor
+                    }]);
                     setNewActivity({ name: '', icon: '✨' });
+                }
+            };
 
-                    setCompletedActivities(prev => {
-                        const updated = { ...prev };
-                        for (let day = 1; day <= 40; day++) {
-                            if (!updated[day]) updated[day] = {};
-                            updated[day][newId] = false;
-                        }
-                        return updated;
-                    });
-                };
-
-                const deleteActivity = (activityId) => {
-                    if (!isAuthenticated) {
-                        showAuthPrompt('login');
-                        return;
+            const deleteActivity = (id) => {
+                if (!requireAuth()) return;
+                setActivities(activities.filter(a => a.id !== id));
+                // Clean up progress data for deleted activity
+                const newProgress = { ...progress };
+                Object.keys(newProgress).forEach(day => {
+                    if (newProgress[day][id]) {
+                        delete newProgress[day][id];
                     }
-                    setActivities(activities.filter(a => a.id !== activityId));
-                    
-                    setCompletedActivities(prev => {
-                        const updated = { ...prev };
-                        for (let day = 1; day <= 40; day++) {
-                            if (updated[day]) {
-                                delete updated[day][activityId];
-                            }
-                        }
-                        return updated;
-                    });
-                };
+                });
+                setProgress(newProgress);
+            };
 
-                const updateActivity = (activityId, updates) => {
-                    if (!isAuthenticated) {
-                        showAuthPrompt('login');
-                        return;
-                    }
-                    setActivities(activities.map(a => 
-                        a.id === activityId ? { ...a, ...updates } : a
-                    ));
-                    setEditingActivity(null);
-                };
-
-                const moveActivity = (activityId, direction) => {
-                    if (!isAuthenticated) {
-                        showAuthPrompt('login');
-                        return;
-                    }
-                    const currentIndex = activities.findIndex(a => a.id === activityId);
-                    const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
-                    
-                    if (newIndex < 0 || newIndex >= activities.length) return;
-                    
+            const moveActivity = (id, direction) => {
+                if (!requireAuth()) return;
+                const currentIndex = activities.findIndex(a => a.id === id);
+                if (direction === 'up' && currentIndex > 0) {
                     const newActivities = [...activities];
-                    [newActivities[currentIndex], newActivities[newIndex]] = [newActivities[newIndex], newActivities[currentIndex]];
+                    [newActivities[currentIndex], newActivities[currentIndex - 1]] = 
+                    [newActivities[currentIndex - 1], newActivities[currentIndex]];
                     setActivities(newActivities);
+                } else if (direction === 'down' && currentIndex < activities.length - 1) {
+                    const newActivities = [...activities];
+                    [newActivities[currentIndex], newActivities[currentIndex + 1]] = 
+                    [newActivities[currentIndex + 1], newActivities[currentIndex]];
+                    setActivities(newActivities);
+                }
+            };
+
+            const exportData = () => {
+                if (!requireAuth()) return;
+                const data = {
+                    activities,
+                    progress,
+                    currentDay,
+                    exportDate: new Date().toISOString()
                 };
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `40-day-tracker-${new Date().toISOString().split('T')[0]}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+            };
 
-                const exportData = () => {
-                    if (!isAuthenticated) {
-                        showAuthPrompt('login');
-                        return;
-                    }
-                    const exportObject = {
-                        version: '1.0',
-                        exportDate: new Date().toISOString(),
-                        currentDay,
-                        activities,
-                        completedActivities,
-                        user: currentUser.email
-                    };
-                    
-                    const dataStr = JSON.stringify(exportObject, null, 2);
-                    const dataBlob = new Blob([dataStr], { type: 'application/json' });
-                    const url = URL.createObjectURL(dataBlob);
-                    
-                    const link = document.createElement('a');
-                    link.href = url;
-                    link.download = `40-day-tracker-${currentUser.name}-${new Date().toISOString().split('T')[0]}.json`;
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                    URL.revokeObjectURL(url);
-                };
-
-                const importData = (event) => {
-                    if (!isAuthenticated) {
-                        showAuthPrompt('login');
-                        return;
-                    }
-                    const file = event.target.files[0];
-                    if (!file) return;
-
+            const importData = (event) => {
+                if (!requireAuth()) return;
+                const file = event.target.files[0];
+                if (file && file.type === 'application/json') {
                     const reader = new FileReader();
                     reader.onload = (e) => {
                         try {
-                            const importedData = JSON.parse(e.target.result);
-                            
-                            if (importedData.activities && importedData.completedActivities) {
-                                setActivities(importedData.activities);
-                                setCompletedActivities(importedData.completedActivities);
-                                if (importedData.currentDay) {
-                                    setCurrentDay(importedData.currentDay);
-                                }
-                                alert('Data imported successfully!');
-                            } else {
-                                alert('Invalid file format. Please select a valid tracker export file.');
-                            }
+                            const data = JSON.parse(e.target.result);
+                            setActivities(data.activities || activities);
+                            setProgress(data.progress || {});
+                            setCurrentDay(data.currentDay || 1);
+                            alert('Data imported successfully!');
                         } catch (error) {
-                            alert('Error reading file. Please make sure it\'s a valid JSON export file.');
+                            alert('Error importing data. Please check the file format.');
                         }
                     };
                     reader.readAsText(file);
-                    event.target.value = '';
-                };
+                }
+                event.target.value = '';
+            };
 
-                const connectToSupabase = () => {
-                    if (!isAuthenticated) {
-                        showAuthPrompt('login');
-                        return;
-                    }
-                    if (supabaseUrl && supabaseKey && userId) {
-                        setIsConnected(true);
-                        setShowSupabaseSetup(false);
-                        alert('Successfully connected to Supabase! Your data will now sync to the cloud.');
-                    }
-                };
+            const connectToCloud = async () => {
+                // Demo connection - would integrate with real Supabase in production
+                setIsCloudConnected(true);
+                setShowCloudSetup(false);
+                alert('Connected to Cloud! (Demo mode)');
+            };
 
-                return h('div', { className: 'min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50' }, [
-                    // Celebration Animation
-                    showCelebration && h('div', { 
-                        key: 'celebration',
-                        className: 'fixed inset-0 flex items-center justify-center z-50 pointer-events-none' 
-                    }, 
-                        h('div', { className: 'animate-bounce text-6xl' }, '🎉')
-                    ),
+            const stats = getCompletionStats();
 
-                    // Auth Modal
-                    showAuthModal && h('div', {
-                        key: 'auth-modal',
-                        className: 'fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4'
-                    },
-                        h('div', { className: 'bg-white rounded-2xl shadow-2xl max-w-md w-full p-6' }, [
-                            h('div', { key: 'header', className: 'flex items-center justify-between mb-4' }, [
-                                h('h3', { className: 'text-xl font-bold text-gray-800' }, 
-                                    authMode === 'login' ? 'Sign In' : 'Create Account'
-                                ),
-                                h('button', {
-                                    onClick: () => setShowAuthModal(false),
-                                    className: 'p-2 hover:bg-gray-100 rounded-lg'
-                                }, '✕')
-                            ]),
-                            h('div', { key: 'content', className: 'space-y-4' }, [
-                                h('div', {}, [
-                                    h('p', { className: 'text-gray-600 mb-4' }, 
-                                        authMode === 'login' 
-                                            ? 'Sign in to access your personalized habit tracker with custom activities, progress tracking, and data sync.'
-                                            : 'Create your account to start your personalized 40-day habit transformation journey!'
-                                    )
-                                ]),
-                                h('div', {}, [
-                                    h('label', { className: 'block text-sm font-medium text-gray-700 mb-2' }, 'Email'),
-                                    h('input', {
-                                        type: 'email',
-                                        value: authForm.email,
-                                        onChange: (e) => setAuthForm({ ...authForm, email: e.target.value }),
-                                        placeholder: 'your@email.com',
-                                        className: 'w-full p-3 border border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none'
-                                    })
-                                ]),
-                                h('div', {}, [
-                                    h('label', { className: 'block text-sm font-medium text-gray-700 mb-2' }, 'Password'),
-                                    h('input', {
-                                        type: 'password',
-                                        value: authForm.password,
-                                        onChange: (e) => setAuthForm({ ...authForm, password: e.target.value }),
-                                        placeholder: '••••••••',
-                                        className: 'w-full p-3 border border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none'
-                                    })
-                                ]),
-                                authMode === 'register' && h('div', {}, [
-                                    h('label', { className: 'block text-sm font-medium text-gray-700 mb-2' }, 'Confirm Password'),
-                                    h('input', {
-                                        type: 'password',
-                                        value: authForm.confirmPassword,
-                                        onChange: (e) => setAuthForm({ ...authForm, confirmPassword: e.target.value }),
-                                        placeholder: '••••••••',
-                                        className: 'w-full p-3 border border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none'
-                                    })
-                                ]),
-                                h('button', {
-                                    onClick: handleAuth,
-                                    className: 'w-full px-4 py-3 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg hover:opacity-90 transition-all duration-200'
-                                }, authMode === 'login' ? 'Sign In' : 'Create Account'),
-                                h('div', { className: 'text-center' }, [
-                                    h('p', { className: 'text-sm text-gray-600' },
-                                        authMode === 'login' 
-                                            ? "Don't have an account? "
-                                            : "Already have an account? "
-                                    ),
-                                    h('button', {
-                                        onClick: () => setAuthMode(authMode === 'login' ? 'register' : 'login'),
-                                        className: 'text-indigo-600 hover:text-indigo-800 font-medium'
-                                    }, authMode === 'login' ? 'Sign up' : 'Sign in')
-                                ])
-                            ])
-                        ])
-                    ),
+            return (
+                <div className="min-h-screen gradient-bg">
+                    {/* Demo Banner for Non-Authenticated Users */}
+                    {!isAuthenticated && (
+                        <div className="bg-amber-100 border-b border-amber-200 px-4 py-2 text-center">
+                            <span className="text-amber-800 text-sm font-medium">
+                                🌟 Demo Mode - Create an account for full personalization and progress tracking!
+                            </span>
+                        </div>
+                    )}
 
-                    // Header
-                    h('div', { 
-                        key: 'header',
-                        className: 'bg-white/80 backdrop-blur-sm border-b border-gray-200/50 sticky top-0 z-40' 
-                    },
-                        h('div', { className: 'max-w-6xl mx-auto px-6 py-6' },
-                            h('div', { className: 'flex items-center justify-between flex-wrap gap-4' }, [
-                                h('div', { key: 'title', className: 'flex items-center gap-3' }, [
-                                    h('div', { 
-                                        key: 'icon',
-                                        className: 'p-3 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl text-white' 
-                                    }, '🎯'),
-                                    h('div', { key: 'text' }, [
-                                        h('h1', { className: 'text-2xl font-bold text-gray-800' }, '40-Day Challenge'),
-                                        h('p', { className: 'text-gray-600' }, isAuthenticated 
-                                            ? `Welcome back, ${currentUser?.name}!`
-                                            : 'Transform your habits, day by day'
-                                        )
-                                    ])
-                                ]),
-                                h('div', { key: 'controls', className: 'flex items-center gap-6' }, [
-                                    !isAuthenticated ? h('div', { key: 'auth-buttons', className: 'flex items-center gap-2' }, [
-                                        h('button', {
-                                            onClick: () => showAuthPrompt('login'),
-                                            className: 'px-4 py-2 text-indigo-600 border border-indigo-600 rounded-lg hover:bg-indigo-50 transition-all duration-200'
-                                        }, 'Sign In'),
-                                        h('button', {
-                                            onClick: () => showAuthPrompt('register'),
-                                            className: 'px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg hover:opacity-90 transition-all duration-200'
-                                        }, 'Sign Up')
-                                    ]) : [
-                                        h('div', { key: 'app-buttons', className: 'flex items-center gap-2' }, [
-                                            h('button', {
-                                                key: 'setup',
-                                                onClick: () => setShowSupabaseSetup(true),
-                                                className: `flex items-center gap-2 px-3 py-2 rounded-xl transition-all duration-200 ${
-                                                    isConnected 
-                                                        ? 'bg-green-100 text-green-700' 
+                    {/* Header */}
+                    <div className="bg-white shadow-lg">
+                        <div className="max-w-6xl mx-auto px-6 py-4">
+                            <div className="flex justify-between items-center">
+                                <div className="flex items-center space-x-3">
+                                    <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
+                                        <span className="text-white font-bold">H</span>
+                                    </div>
+                                    <h1 className="text-2xl font-bold text-gray-800">40-Day Habit Tracker</h1>
+                                    {isAuthenticated && currentUser && (
+                                        <span className="text-sm text-gray-600">Welcome, {currentUser.name || currentUser.email}!</span>
+                                    )}
+                                </div>
+                                
+                                <div className="flex items-center space-x-2">
+                                    {isAuthenticated ? (
+                                        <>
+                                            <button
+                                                onClick={() => setShowCloudSetup(true)}
+                                                className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                                    isCloudConnected 
+                                                        ? 'bg-green-100 text-green-700 hover:bg-green-200' 
                                                         : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
-                                                }`,
-                                                title: isConnected ? 'Connected to cloud' : 'Setup cloud sync'
-                                            }, [
-                                                h('span', { key: 'icon' }, isConnected ? '☁️' : '🔒'),
-                                                h('span', { key: 'text', className: 'hidden sm:inline' }, isConnected ? 'Cloud' : 'Setup')
-                                            ]),
-                                            h('button', {
-                                                key: 'export',
-                                                onClick: exportData,
-                                                className: 'flex items-center gap-2 px-3 py-2 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-xl transition-all duration-200',
-                                                title: 'Export backup file'
-                                            }, [
-                                                h('span', { key: 'icon' }, '⬇️'),
-                                                h('span', { key: 'text', className: 'hidden sm:inline' }, 'Export')
-                                            ]),
-                                            h('label', {
-                                                key: 'import',
-                                                className: 'flex items-center gap-2 px-3 py-2 bg-purple-100 text-purple-700 hover:bg-purple-200 rounded-xl transition-all duration-200 cursor-pointer'
-                                            }, [
-                                                h('span', { key: 'icon' }, '⬆️'),
-                                                h('span', { key: 'text', className: 'hidden sm:inline' }, 'Import'),
-                                                h('input', {
-                                                    key: 'input',
-                                                    type: 'file',
-                                                    accept: '.json',
-                                                    onChange: importData,
-                                                    className: 'hidden'
-                                                })
-                                            ])
-                                        ]),
-                                        h('button', {
-                                            key: 'edit',
-                                            onClick: () => {
-                                                if (!isAuthenticated) {
-                                                    showAuthPrompt('login');
-                                                    return;
-                                                }
-                                                setIsEditingActivities(!isEditingActivities);
-                                            },
-                                            className: `flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-200 ${
-                                                isEditingActivities 
-                                                    ? 'bg-indigo-100 text-indigo-700' 
-                                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                            }`
-                                        }, [
-                                            h('span', { key: 'icon' }, '⚙️'),
-                                            h('span', { key: 'text', className: 'hidden sm:inline' }, 'Edit Activities')
-                                        ]),
-                                        h('div', { key: 'stats1', className: 'text-center' }, [
-                                            h('div', { className: 'text-2xl font-bold text-indigo-600' }, `${getCompletedDays()}/40`),
-                                            h('div', { className: 'text-sm text-gray-600' }, 'Perfect Days')
-                                        ]),
-                                        h('div', { key: 'stats2', className: 'text-center' }, [
-                                            h('div', { className: 'text-2xl font-bold text-purple-600' }, `${getTotalProgress()}%`),
-                                            h('div', { className: 'text-sm text-gray-600' }, 'Overall Progress')
-                                        ]),
-                                        h('button', {
-                                            key: 'logout',
-                                            onClick: handleLogout,
-                                            className: 'px-3 py-2 text-gray-600 hover:text-gray-800 transition-all duration-200',
-                                            title: 'Sign out'
-                                        }, '🚪')
-                                    ]
-                                ])
-                            ])
-                        )
-                    ),
+                                                }`}
+                                            >
+                                                {isCloudConnected ? '☁️ Connected' : '☁️ Setup'}
+                                            </button>
+                                            <button
+                                                onClick={exportData}
+                                                className="px-3 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors text-sm font-medium"
+                                            >
+                                                📥 Export
+                                            </button>
+                                            <label className="px-3 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors text-sm font-medium cursor-pointer">
+                                                📤 Import
+                                                <input type="file" accept=".json" onChange={importData} className="hidden" />
+                                            </label>
+                                            <button
+                                                onClick={() => setEditMode(!editMode)}
+                                                className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                                    editMode 
+                                                        ? 'bg-gray-700 text-white' 
+                                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                                }`}
+                                            >
+                                                ⚙️ {editMode ? 'Done' : 'Edit Activities'}
+                                            </button>
+                                            <button
+                                                onClick={handleLogout}
+                                                className="px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors text-sm font-medium"
+                                            >
+                                                🚪 Logout
+                                            </button>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <button
+                                                onClick={() => { setAuthMode('login'); setShowAuthModal(true); }}
+                                                className="px-4 py-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors font-medium"
+                                            >
+                                                Login
+                                            </button>
+                                            <button
+                                                onClick={() => { setAuthMode('register'); setShowAuthModal(true); }}
+                                                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium"
+                                            >
+                                                Register
+                                            </button>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
-                    // Main Content Container
-                    h('div', { key: 'main', className: 'max-w-6xl mx-auto px-6 py-8' }, [
-                        // Demo banner for non-authenticated users
-                        !isAuthenticated && h('div', {
-                            key: 'demo-banner',
-                            className: 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-2xl p-6 mb-8 text-center'
-                        }, [
-                            h('h2', { className: 'text-2xl font-bold mb-2' }, '✨ Preview Mode'),
-                            h('p', { className: 'mb-4' }, 'You\'re viewing a demo of the 40-Day Habit Tracker. Sign up for a personalized experience with custom activities, progress tracking, and data sync!'),
-                            h('div', { className: 'flex justify-center gap-4' }, [
-                                h('button', {
-                                    onClick: () => showAuthPrompt('register'),
-                                    className: 'px-6 py-3 bg-white text-indigo-600 rounded-lg font-semibold hover:bg-gray-100 transition-all duration-200'
-                                }, 'Create Free Account'),
-                                h('button', {
-                                    onClick: () => showAuthPrompt('login'),
-                                    className: 'px-6 py-3 border-2 border-white text-white rounded-lg font-semibold hover:bg-white hover:text-indigo-600 transition-all duration-200'
-                                }, 'Sign In')
-                            ])
-                        ]),
+                    {/* Demo Message */}
+                    {showDemoMessage && (
+                        <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg p-6 shadow-2xl z-50 border-2 border-purple-200 max-w-sm w-full mx-4">
+                            <div className="text-center">
+                                <div className="text-4xl mb-3">🔒</div>
+                                <h3 className="text-lg font-bold text-gray-800 mb-2">Account Required</h3>
+                                <p className="text-gray-600 mb-4">Having an account will provide a much more customized experience!</p>
+                                <div className="flex space-x-3">
+                                    <button
+                                        onClick={() => { setAuthMode('register'); setShowAuthModal(true); setShowDemoMessage(false); }}
+                                        className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium"
+                                    >
+                                        Register
+                                    </button>
+                                    <button
+                                        onClick={() => { setAuthMode('login'); setShowAuthModal(true); setShowDemoMessage(false); }}
+                                        className="flex-1 px-4 py-2 text-purple-600 border border-purple-300 rounded-lg hover:bg-purple-50 transition-colors font-medium"
+                                    >
+                                        Login
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
-                        // Supabase Setup Modal (only for authenticated users)
-                        isAuthenticated && showSupabaseSetup && h('div', {
-                            key: 'supabase-modal',
-                            className: 'fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4'
-                        },
-                            h('div', { className: 'bg-white rounded-2xl shadow-2xl max-w-md w-full p-6' }, [
-                                h('div', { key: 'header', className: 'flex items-center justify-between mb-4' }, [
-                                    h('h3', { className: 'text-xl font-bold text-gray-800' }, 'Cloud Sync Setup'),
-                                    h('button', {
-                                        onClick: () => setShowSupabaseSetup(false),
-                                        className: 'p-2 hover:bg-gray-100 rounded-lg'
-                                    }, '✕')
-                                ]),
-                                !isConnected ? h('div', { key: 'form', className: 'space-y-4' }, [
-                                    h('div', { key: 'url' }, [
-                                        h('label', { className: 'block text-sm font-medium text-gray-700 mb-2' }, 'Supabase Project URL'),
-                                        h('input', {
-                                            type: 'text',
-                                            value: supabaseUrl,
-                                            onChange: (e) => setSupabaseUrl(e.target.value),
-                                            placeholder: 'https://your-project.supabase.co',
-                                            className: 'w-full p-3 border border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none'
-                                        })
-                                    ]),
-                                    h('div', { key: 'key' }, [
-                                        h('label', { className: 'block text-sm font-medium text-gray-700 mb-2' }, 'Supabase API Key'),
-                                        h('input', {
-                                            type: 'password',
-                                            value: supabaseKey,
-                                            onChange: (e) => setSupabaseKey(e.target.value),
-                                            placeholder: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
-                                            className: 'w-full p-3 border border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none'
-                                        })
-                                    ]),
-                                    h('div', { key: 'user' }, [
-                                        h('label', { className: 'block text-sm font-medium text-gray-700 mb-2' }, 'Your User ID'),
-                                        h('input', {
-                                            type: 'text',
-                                            value: userId,
-                                            onChange: (e) => setUserId(e.target.value),
-                                            placeholder: 'your-name-or-email',
-                                            className: 'w-full p-3 border border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none'
-                                        })
-                                    ]),
-                                    h('button', {
-                                        key: 'connect',
-                                        onClick: connectToSupabase,
-                                        disabled: !supabaseUrl || !supabaseKey || !userId,
-                                        className: 'w-full px-4 py-3 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200'
-                                    }, 'Connect to Cloud')
-                                ]) : h('div', { key: 'connected', className: 'text-center space-y-4' }, [
-                                    h('div', { className: 'text-green-600' }, [
-                                        h('div', { className: 'text-4xl mb-2' }, '☁️'),
-                                        h('p', { className: 'font-semibold' }, 'Connected to Cloud!'),
-                                        h('p', { className: 'text-sm text-gray-600' }, 'Your progress syncs to Supabase')
-                                    ]),
-                                    h('button', {
-                                        onClick: () => {
-                                            setIsConnected(false);
-                                            setShowSupabaseSetup(false);
-                                        },
-                                        className: 'w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-all duration-200'
-                                    }, 'Disconnect')
-                                ])
-                            ])
-                        ),
-
-                        // Activity Editor (with auth protection)
-                        isEditingActivities && h('div', { 
-                            key: 'edit-activities', 
-                            className: isAuthenticated ? 'bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden mb-8' : 'bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden mb-8 blur-interaction'
-                        }, [
-                            !isAuthenticated && h('div', {
-                                key: 'auth-overlay',
-                                className: 'absolute inset-0 flex items-center justify-center z-20 bg-white/90'
-                            }, 
-                                h('div', { className: 'text-center p-6' }, [
-                                    h('h3', { className: 'text-xl font-bold text-gray-800 mb-2' }, '🔒 Account Required'),
-                                    h('p', { className: 'text-gray-600 mb-4' }, 'Having an account will provide a much more customized experience!'),
-                                    h('div', { className: 'flex gap-3 justify-center' }, [
-                                        h('button', {
-                                            onClick: () => showAuthPrompt('register'),
-                                            className: 'px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg hover:opacity-90'
-                                        }, 'Register'),
-                                        h('button', {
-                                            onClick: () => showAuthPrompt('login'),
-                                            className: 'px-4 py-2 border border-indigo-500 text-indigo-500 rounded-lg hover:bg-indigo-50'
-                                        }, 'Login')
-                                    ])
-                                ])
-                            ),
-                            h('div', { key: 'header', className: 'bg-gradient-to-r from-gray-700 to-gray-900 px-6 py-4' },
-                                h('h2', { className: 'text-xl font-bold text-white' }, 'Customize Your Activities')
-                            ),
-                            h('div', { key: 'content', className: 'p-6 space-y-6' }, [
-                                h('div', { key: 'add-activity', className: 'bg-gray-50 rounded-xl p-4' }, [
-                                    h('h3', { className: 'font-semibold text-gray-800 mb-4' }, 'Add New Activity'),
-                                    h('div', { className: 'flex gap-3' }, [
-                                        h('select', {
-                                            value: newActivity.icon,
-                                            onChange: (e) => setNewActivity({ ...newActivity, icon: e.target.value }),
-                                            className: 'p-2 rounded-lg border border-gray-300 bg-white text-xl'
-                                        }, availableIcons.map(icon =>
-                                            h('option', { key: icon, value: icon }, icon)
-                                        )),
-                                        h('input', {
-                                            type: 'text',
-                                            value: newActivity.name,
-                                            onChange: (e) => setNewActivity({ ...newActivity, name: e.target.value }),
-                                            placeholder: 'Activity name (e.g., Walk 10,000 steps)',
-                                            className: 'flex-1 p-3 rounded-lg border border-gray-300 focus:border-indigo-500 focus:outline-none',
-                                            onKeyPress: (e) => e.key === 'Enter' && addActivity()
-                                        }),
-                                        h('button', {
-                                            onClick: addActivity,
-                                            disabled: !newActivity.name.trim(),
-                                            className: 'px-6 py-3 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200'
-                                        }, '➕')
-                                    ])
-                                ]),
-                                h('div', { key: 'activities-list' }, [
-                                    h('h3', { className: 'font-semibold text-gray-800 mb-4' }, 'Your Activities'),
-                                    h('div', { className: 'space-y-3' },
-                                        activities.map((activity, index) =>
-                                            h('div', { key: activity.id, className: 'flex items-center gap-4 p-4 bg-gray-50 rounded-xl' }, [
-                                                editingActivity === activity.id ? [
-                                                    h('select', {
-                                                        key: 'icon-edit',
-                                                        value: activity.icon,
-                                                        onChange: (e) => updateActivity(activity.id, { icon: e.target.value }),
-                                                        className: 'p-2 rounded-lg border border-gray-300 bg-white text-xl'
-                                                    }, availableIcons.map(icon =>
-                                                        h('option', { key: icon, value: icon }, icon)
-                                                    )),
-                                                    h('input', {
-                                                        key: 'name-edit',
-                                                        type: 'text',
-                                                        value: activity.name,
-                                                        onChange: (e) => updateActivity(activity.id, { name: e.target.value }),
-                                                        className: 'flex-1 p-2 rounded-lg border border-gray-300 focus:border-indigo-500 focus:outline-none',
-                                                        onKeyPress: (e) => e.key === 'Enter' && setEditingActivity(null),
-                                                        onBlur: () => setEditingActivity(null),
-                                                        autoFocus: true
-                                                    })
-                                                ] : [
-                                                    h('div', { key: 'icon', className: 'text-2xl' }, activity.icon),
-                                                    h('div', { key: 'name', className: 'flex-1 font-medium text-gray-800' }, activity.name),
-                                                    h('div', { key: 'controls', className: 'flex items-center gap-1' }, [
-                                                        h('button', {
-                                                            onClick: () => moveActivity(activity.id, 'up'),
-                                                            disabled: index === 0,
-                                                            className: 'p-1.5 text-gray-500 hover:text-indigo-600 hover:bg-indigo-100 rounded-lg transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed',
-                                                            title: 'Move up'
-                                                        }, '⬆️'),
-                                                        h('button', {
-                                                            onClick: () => moveActivity(activity.id, 'down'),
-                                                            disabled: index === activities.length - 1,
-                                                            className: 'p-1.5 text-gray-500 hover:text-indigo-600 hover:bg-indigo-100 rounded-lg transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed',
-                                                            title: 'Move down'
-                                                        }, '⬇️'),
-                                                        h('button', {
-                                                            onClick: () => setEditingActivity(activity.id),
-                                                            className: 'p-2 text-gray-500 hover:text-indigo-600 hover:bg-indigo-100 rounded-lg transition-all duration-200',
-                                                            title: 'Edit activity'
-                                                        }, '✏️'),
-                                                        h('button', {
-                                                            onClick: () => deleteActivity(activity.id),
-                                                            className: 'p-2 text-gray-500 hover:text-red-600 hover:bg-red-100 rounded-lg transition-all duration-200',
-                                                            title: 'Delete activity'
-                                                        }, '❌')
-                                                    ])
-                                                ]
-                                            ])
-                                        )
-                                    )
-                                ])
-                            ])
-                        ]),
-
-                        // Day Selector
-                        h('div', { key: 'days', className: 'mb-8' }, [
-                            h('div', { key: 'header', className: 'flex items-center gap-4 mb-4' }, [
-                                h('span', { className: 'text-indigo-600 text-xl' }, '📅'),
-                                h('h2', { className: 'text-lg font-semibold text-gray-800' }, 'Select Day')
-                            ]),
-                            h('div', { key: 'buttons', className: 'flex flex-wrap gap-2' },
-                                Array.from({ length: 40 }, (_, i) => i + 1).map(day =>
-                                    h('button', {
-                                        key: day,
-                                        onClick: () => isAuthenticated ? setCurrentDay(day) : showAuthPrompt('login'),
-                                        className: `w-12 h-12 rounded-lg font-semibold transition-all duration-200 ${
-                                            currentDay === day
-                                                ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg scale-110'
-                                                : getDayProgress(day) === 100
-                                                ? 'bg-gradient-to-r from-green-400 to-green-600 text-white'
-                                                : getDayProgress(day) > 0
-                                                ? 'bg-gradient-to-r from-yellow-400 to-orange-500 text-white'
-                                                : 'bg-white border-2 border-gray-200 text-gray-600 hover:border-indigo-300'
-                                        }`
-                                    }, day.toString())
-                                )
-                            )
-                        ]),
-
-                        // Current Day Activities
-                        h('div', { 
-                            key: 'activities', 
-                            className: !isAuthenticated ? 'bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden mb-8 blur-interaction' : 'bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden mb-8'
-                        }, [
-                            !isAuthenticated && h('div', {
-                                key: 'auth-overlay',
-                                className: 'absolute inset-0 flex items-center justify-center z-20 bg-white/90'
-                            }, 
-                                h('div', { className: 'text-center p-6' }, [
-                                    h('h3', { className: 'text-xl font-bold text-gray-800 mb-2' }, '🔒 Account Required'),
-                                    h('p', { className: 'text-gray-600 mb-4' }, 'Having an account will provide a much more customized experience!'),
-                                    h('div', { className: 'flex gap-3 justify-center' }, [
-                                        h('button', {
-                                            onClick: () => showAuthPrompt('register'),
-                                            className: 'px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg hover:opacity-90'
-                                        }, 'Register'),
-                                        h('button', {
-                                            onClick: () => showAuthPrompt('login'),
-                                            className: 'px-4 py-2 border border-indigo-500 text-indigo-500 rounded-lg hover:bg-indigo-50'
-                                        }, 'Login')
-                                    ])
-                                ])
-                            ),
-                            h('div', { key: 'header', className: 'bg-gradient-to-r from-indigo-500 to-purple-600 px-6 py-4' },
-                                h('div', { className: 'flex items-center justify-between text-white' }, [
-                                    h('h2', { className: 'text-xl font-bold' }, `Day ${currentDay} Activities`),
-                                    h('div', { className: 'flex items-center gap-2' }, [
-                                        h('div', { className: 'text-sm opacity-90' }, 'Progress:'),
-                                        h('div', { className: 'text-lg font-bold' }, `${getDayProgress(currentDay)}%`)
-                                    ])
-                                ])
-                            ),
-                            h('div', { key: 'content', className: 'p-6 space-y-4' },
-                                activities.map(activity => {
-                                    const isCompleted = completedActivities[currentDay]?.[activity.id];
-                                    const streak = getActivityStreak(activity.id);
+                    {/* Auth Modal */}
+                    {showAuthModal && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                            <div className="bg-white rounded-lg p-6 w-full max-w-md">
+                                <div className="flex justify-between items-center mb-4">
+                                    <h2 className="text-xl font-bold text-gray-800">
+                                        {authMode === 'login' ? 'Welcome Back!' : 'Create Account'}
+                                    </h2>
+                                    <button
+                                        onClick={() => setShowAuthModal(false)}
+                                        className="text-gray-500 hover:text-gray-700 text-xl"
+                                    >
+                                        ×
+                                    </button>
+                                </div>
+                                
+                                <form onSubmit={handleAuth} className="space-y-4">
+                                    {authMode === 'register' && (
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                                            <input
+                                                type="text"
+                                                value={authForm.name}
+                                                onChange={(e) => setAuthForm({...authForm, name: e.target.value})}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                                required
+                                            />
+                                        </div>
+                                    )}
                                     
-                                    return h('div', {
-                                        key: activity.id,
-                                        className: `p-4 rounded-xl border-2 transition-all duration-300 cursor-pointer ${
-                                            isCompleted
-                                                ? 'border-green-300 bg-green-50'
-                                                : 'border-gray-200 bg-gray-50 hover:border-indigo-300 hover:bg-indigo-50'
-                                        }`,
-                                        onClick: () => toggleActivity(currentDay, activity.id)
-                                    },
-                                        h('div', { className: 'flex items-center justify-between' }, [
-                                            h('div', { key: 'info', className: 'flex items-center gap-4' }, [
-                                                h('div', { className: 'text-2xl' }, activity.icon),
-                                                h('div', { key: 'details' }, [
-                                                    h('h3', { className: 'font-semibold text-gray-800' }, activity.name),
-                                                    streak > 0 && h('div', { className: 'flex items-center gap-1 mt-1' }, [
-                                                        h('span', { className: 'text-orange-500' }, '🔥'),
-                                                        h('span', { className: 'text-sm text-orange-600' }, `${streak} day streak`)
-                                                    ])
-                                                ])
-                                            ]),
-                                            h('div', {
-                                                key: 'status',
-                                                className: `p-2 rounded-full transition-all duration-200 ${
-                                                    isCompleted ? 'bg-green-500' : 'bg-gray-300'
-                                                }`
-                                            }, 
-                                                h('span', { 
-                                                    className: 'text-white text-xl block w-6 h-6 flex items-center justify-center' 
-                                                }, isCompleted ? '✓' : '○')
-                                            )
-                                        ])
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                                        <input
+                                            type="email"
+                                            value={authForm.email}
+                                            onChange={(e) => setAuthForm({...authForm, email: e.target.value})}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                            required
+                                        />
+                                    </div>
+                                    
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                                        <input
+                                            type="password"
+                                            value={authForm.password}
+                                            onChange={(e) => setAuthForm({...authForm, password: e.target.value})}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                            required
+                                        />
+                                    </div>
+                                    
+                                    <button
+                                        type="submit"
+                                        className="w-full py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium"
+                                    >
+                                        {authMode === 'login' ? 'Login' : 'Create Account'}
+                                    </button>
+                                </form>
+                                
+                                <div className="mt-4 text-center">
+                                    <button
+                                        onClick={() => setAuthMode(authMode === 'login' ? 'register' : 'login')}
+                                        className="text-purple-600 hover:text-purple-700 text-sm"
+                                    >
+                                        {authMode === 'login' 
+                                            ? "Don't have an account? Register here" 
+                                            : "Already have an account? Login here"
+                                        }
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Cloud Setup Modal */}
+                    {showCloudSetup && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                            <div className="bg-white rounded-lg p-6 w-full max-w-md">
+                                <div className="flex justify-between items-center mb-4">
+                                    <h2 className="text-xl font-bold text-gray-800">Cloud Setup</h2>
+                                    <button
+                                        onClick={() => setShowCloudSetup(false)}
+                                        className="text-gray-500 hover:text-gray-700 text-xl"
+                                    >
+                                        ×
+                                    </button>
+                                </div>
+                                
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Supabase Project URL</label>
+                                        <input
+                                            type="url"
+                                            value={cloudConfig.url}
+                                            onChange={(e) => setCloudConfig({...cloudConfig, url: e.target.value})}
+                                            placeholder="https://your-project.supabase.co"
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                                        />
+                                    </div>
+                                    
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Supabase API Key</label>
+                                        <input
+                                            type="password"
+                                            value={cloudConfig.key}
+                                            onChange={(e) => setCloudConfig({...cloudConfig, key: e.target.value})}
+                                            placeholder="eyJhbGci..."
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                                        />
+                                    </div>
+                                    
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Your User ID</label>
+                                        <input
+                                            type="text"
+                                            value={cloudConfig.userId}
+                                            onChange={(e) => setCloudConfig({...cloudConfig, userId: e.target.value})}
+                                            placeholder="your-name or email"
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                                        />
+                                    </div>
+                                    
+                                    <button
+                                        onClick={connectToCloud}
+                                        className="w-full py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
+                                        disabled={!cloudConfig.url || !cloudConfig.key || !cloudConfig.userId}
+                                    >
+                                        Connect to Cloud
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="max-w-6xl mx-auto p-6">
+                        {/* Stats Overview */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                            <div className="bg-white rounded-xl shadow-lg p-6 card-hover">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-sm text-gray-600">Overall Progress</p>
+                                        <p className="text-3xl font-bold text-purple-600">{stats.completion}%</p>
+                                    </div>
+                                    <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
+                                        <span className="text-2xl">📊</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div className="bg-white rounded-xl shadow-lg p-6 card-hover">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-sm text-gray-600">Current Day</p>
+                                        <p className="text-3xl font-bold text-blue-600">{currentDay}/40</p>
+                                    </div>
+                                    <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                                        <span className="text-2xl">📅</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div className="bg-white rounded-xl shadow-lg p-6 card-hover">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-sm text-gray-600">Perfect Days</p>
+                                        <p className="text-3xl font-bold text-green-600">{stats.perfectDays}</p>
+                                    </div>
+                                    <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                                        <span className="text-2xl">🏆</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Activity Management (Edit Mode) */}
+                        {editMode && isAuthenticated && (
+                            <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
+                                <h2 className="text-xl font-bold text-gray-800 mb-4">Manage Activities</h2>
+                                
+                                {/* Add New Activity */}
+                                <div className="border border-gray-200 rounded-lg p-4 mb-4">
+                                    <h3 className="font-medium text-gray-700 mb-3">Add New Activity</h3>
+                                    <div className="flex gap-3">
+                                        <select
+                                            value={newActivity.icon}
+                                            onChange={(e) => setNewActivity({...newActivity, icon: e.target.value})}
+                                            className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                        >
+                                            {iconOptions.map(icon => (
+                                                <option key={icon} value={icon}>{icon}</option>
+                                            ))}
+                                        </select>
+                                        <input
+                                            type="text"
+                                            placeholder="Activity name..."
+                                            value={newActivity.name}
+                                            onChange={(e) => setNewActivity({...newActivity, name: e.target.value})}
+                                            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                            onKeyPress={(e) => e.key === 'Enter' && addActivity()}
+                                        />
+                                        <button
+                                            onClick={addActivity}
+                                            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                                        >
+                                            ➕
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                {/* Existing Activities */}
+                                <div className="space-y-2">
+                                    {activities.map((activity, index) => (
+                                        <div key={activity.id} className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg">
+                                            <span className="text-xl">{activity.icon}</span>
+                                            {editingActivity === activity.id ? (
+                                                <>
+                                                    <select
+                                                        value={activity.icon}
+                                                        onChange={(e) => {
+                                                            setActivities(activities.map(a => 
+                                                                a.id === activity.id ? {...a, icon: e.target.value} : a
+                                                            ));
+                                                        }}
+                                                        className="px-2 py-1 border border-gray-300 rounded text-sm"
+                                                    >
+                                                        {iconOptions.map(icon => (
+                                                            <option key={icon} value={icon}>{icon}</option>
+                                                        ))}
+                                                    </select>
+                                                    <input
+                                                        type="text"
+                                                        value={activity.name}
+                                                        onChange={(e) => {
+                                                            setActivities(activities.map(a => 
+                                                                a.id === activity.id ? {...a, name: e.target.value} : a
+                                                            ));
+                                                        }}
+                                                        className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
+                                                        onKeyPress={(e) => e.key === 'Enter' && setEditingActivity(null)}
+                                                        autoFocus
+                                                    />
+                                                    <button
+                                                        onClick={() => setEditingActivity(null)}
+                                                        className="px-2 py-1 bg-green-100 text-green-700 rounded text-sm hover:bg-green-200"
+                                                    >
+                                                        ✓
+                                                    </button>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <span className="flex-1 font-medium text-gray-800">{activity.name}</span>
+                                                    <div className="flex items-center gap-1">
+                                                        <button
+                                                            onClick={() => moveActivity(activity.id, 'up')}
+                                                            disabled={index === 0}
+                                                            className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30"
+                                                        >
+                                                            ⬆️
+                                                        </button>
+                                                        <button
+                                                            onClick={() => moveActivity(activity.id, 'down')}
+                                                            disabled={index === activities.length - 1}
+                                                            className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30"
+                                                        >
+                                                            ⬇️
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setEditingActivity(activity.id)}
+                                                            className="p-1 text-blue-500 hover:text-blue-700"
+                                                        >
+                                                            ✏️
+                                                        </button>
+                                                        <button
+                                                            onClick={() => deleteActivity(activity.id)}
+                                                            className="p-1 text-red-500 hover:text-red-700"
+                                                        >
+                                                            ❌
+                                                        </button>
+                                                    </div>
+                                                </>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Day Selector */}
+                        <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
+                            <h2 className="text-xl font-bold text-gray-800 mb-4">40-Day Journey</h2>
+                            <div className="grid grid-cols-8 gap-2 mb-4">
+                                {Array.from({length: 40}, (_, i) => i + 1).map(day => {
+                                    const dayProgress = activities.filter(activity => 
+                                        isActivityCompleted(day, activity.id)
+                                    ).length;
+                                    const totalActivities = activities.length;
+                                    const completionRate = totalActivities > 0 ? dayProgress / totalActivities : 0;
+                                    
+                                    let bgColor = 'bg-gray-100';
+                                    if (completionRate === 1) bgColor = 'bg-green-500 text-white';
+                                    else if (completionRate > 0) bgColor = 'bg-yellow-400';
+                                    
+                                    return (
+                                        <button
+                                            key={day}
+                                            onClick={() => {
+                                                if (requireAuth()) setCurrentDay(day);
+                                            }}
+                                            className={`
+                                                w-10 h-10 rounded-lg font-medium text-sm transition-all card-hover
+                                                ${day === currentDay ? 'ring-2 ring-blue-500' : ''}
+                                                ${bgColor}
+                                                ${!isAuthenticated ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}
+                                            `}
+                                        >
+                                            {day}
+                                        </button>
                                     );
-                                })
-                            )
-                        ]),
+                                })}
+                            </div>
+                            <div className="flex items-center gap-4 text-sm text-gray-600">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-4 h-4 bg-gray-100 rounded"></div>
+                                    <span>Not Started</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <div className="w-4 h-4 bg-yellow-400 rounded"></div>
+                                    <span>In Progress</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <div className="w-4 h-4 bg-green-500 rounded"></div>
+                                    <span>Complete</span>
+                                </div>
+                            </div>
+                        </div>
 
-                        // Statistics Cards
-                        h('div', { key: 'stats', className: 'grid grid-cols-1 md:grid-cols-3 gap-6 mb-8' }, [
-                            h('div', { key: 'streak', className: 'bg-white rounded-xl p-6 shadow-lg border border-gray-100' }, [
-                                h('div', { className: 'flex items-center gap-3 mb-4' }, [
-                                    h('div', { className: 'p-2 bg-blue-100 rounded-lg text-2xl' }, '📈'),
-                                    h('h3', { className: 'font-semibold text-gray-800' }, 'Best Streak')
-                                ]),
-                                h('div', { className: 'text-2xl font-bold text-blue-600' }, 
-                                    `${Math.max(...activities.map(activity => getActivityStreak(activity.id)))} days`
-                                )
-                            ]),
-                            h('div', { key: 'perfect', className: 'bg-white rounded-xl p-6 shadow-lg border border-gray-100' }, [
-                                h('div', { className: 'flex items-center gap-3 mb-4' }, [
-                                    h('div', { className: 'p-2 bg-green-100 rounded-lg text-2xl' }, '🏆'),
-                                    h('h3', { className: 'font-semibold text-gray-800' }, 'Perfect Days')
-                                ]),
-                                h('div', { className: 'text-2xl font-bold text-green-600' }, `${getCompletedDays()}/40`)
-                            ]),
-                            h('div', { key: 'progress', className: 'bg-white rounded-xl p-6 shadow-lg border border-gray-100' }, [
-                                h('div', { className: 'flex items-center gap-3 mb-4' }, [
-                                    h('div', { className: 'p-2 bg-purple-100 rounded-lg text-2xl' }, '🎯'),
-                                    h('h3', { className: 'font-semibold text-gray-800' }, 'Overall Progress')
-                                ]),
-                                h('div', { className: 'text-2xl font-bold text-purple-600' }, `${getTotalProgress()}%`)
-                            ])
-                        ]),
+                        {/* Daily Activities */}
+                        <div className="bg-white rounded-xl shadow-lg p-6">
+                            <div className="flex items-center justify-between mb-6">
+                                <h2 className="text-2xl font-bold text-gray-800">
+                                    Day {currentDay} Activities
+                                </h2>
+                                <div className="text-sm text-gray-600">
+                                    {activities.filter(activity => isActivityCompleted(currentDay, activity.id)).length} / {activities.length} completed
+                                </div>
+                            </div>
+                            
+                            <div className="grid gap-4">
+                                {activities.map(activity => {
+                                    const completed = isActivityCompleted(currentDay, activity.id);
+                                    const streak = getCurrentStreak(activity.id);
+                                    
+                                    return (
+                                        <div
+                                            key={activity.id}
+                                            className={`
+                                                relative p-4 rounded-xl card-hover cursor-pointer border-2 transition-all
+                                                ${completed ? 'border-green-300 bg-green-50' : 'border-gray-200 bg-white'}
+                                                ${!isAuthenticated ? 'opacity-60' : ''}
+                                            `}
+                                            onClick={() => toggleActivity(currentDay, activity.id)}
+                                        >
+                                            {!isAuthenticated && (
+                                                <div className="absolute inset-0 bg-white bg-opacity-50 blur-overlay rounded-xl"></div>
+                                            )}
+                                            
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center space-x-4">
+                                                    <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white text-xl ${activity.color}`}>
+                                                        {activity.icon}
+                                                    </div>
+                                                    <div>
+                                                        <h3 className="font-medium text-gray-800">{activity.name}</h3>
+                                                        {streak > 0 && (
+                                                            <div className="flex items-center space-x-1 text-sm text-orange-600">
+                                                                <span>🔥</span>
+                                                                <span>{streak} day streak!</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                
+                                                <div className="flex items-center space-x-3">
+                                                    {completed ? (
+                                                        <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-white bounce-in">
+                                                            ✓
+                                                        </div>
+                                                    ) : (
+                                                        <div className="w-8 h-8 border-2 border-gray-300 rounded-full"></div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                            
+                            {/* Completion Celebration */}
+                            {isAuthenticated && activities.every(activity => isActivityCompleted(currentDay, activity.id)) && activities.length > 0 && (
+                                <div className="mt-6 text-center p-4 bg-gradient-to-r from-green-400 to-blue-500 rounded-xl text-white celebration">
+                                    <div className="text-4xl mb-2">🎉</div>
+                                    <h3 className="text-xl font-bold">Day {currentDay} Complete!</h3>
+                                    <p>You're building amazing habits!</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
 
-                        // Progress Overview
-                        h('div', { key: 'overview', className: 'bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden' }, [
-                            h('div', { key: 'header', className: 'bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b' },
-                                h('h2', { className: 'text-xl font-bold text-gray-800' }, '40-Day Overview')
-                            ),
-                            h('div', { key: 'content', className: 'p-6' }, [
-                                h('div', { key: 'grid', className: 'grid grid-cols-10 gap-2' },
-                                    Array.from({ length: 40 }, (_, i) => i + 1).map(day => {
-                                        const progress = getDayProgress(day);
-                                        return h('div', {
-                                            key: day,
-                                            className: `w-full h-8 rounded-md border-2 cursor-pointer transition-all duration-200 flex items-center justify-center text-xs font-semibold ${
-                                                day === currentDay
-                                                    ? 'border-indigo-500 bg-indigo-100'
-                                                    : progress === 100
-                                                    ? 'border-green-400 bg-green-400 text-white'
-                                                    : progress > 0
-                                                    ? 'border-yellow-400 bg-yellow-400 text-white'
-                                                    : 'border-gray-200 bg-gray-100 text-gray-500'
-                                            }`,
-                                            onClick: () => isAuthenticated ? setCurrentDay(day) : showAuthPrompt('login'),
-                                            title: `Day ${day}: ${progress}% complete`
-                                        }, day.toString());
-                                    })
-                                ),
-                                h('div', { key: 'legend', className: 'flex items-center justify-center gap-6 mt-4 text-sm' }, [
-                                    h('div', { key: 'not-started', className: 'flex items-center gap-2' }, [
-                                        h('div', { className: 'w-4 h-4 bg-gray-100 border border-gray-200 rounded' }),
-                                        h('span', {}, 'Not started')
-                                    ]),
-                                    h('div', { key: 'progress', className: 'flex items-center gap-2' }, [
-                                        h('div', { className: 'w-4 h-4 bg-yellow-400 rounded' }),
-                                        h('span', {}, 'In progress')
-                                    ]),
-                                    h('div', { key: 'complete', className: 'flex items-center gap-2' }, [
-                                        h('div', { className: 'w-4 h-4 bg-green-400 rounded' }),
-                                        h('span', {}, 'Complete')
-                                    ])
-                                ])
-                            ])
-                        ])
-                    ])
-                ]);
+        // Wait for React to load, then render
+        const checkReact = () => {
+            if (typeof React !== 'undefined' && typeof ReactDOM !== 'undefined') {
+                const root = ReactDOM.createRoot(document.getElementById('root'));
+                root.render(React.createElement(HabitTracker));
+            } else {
+                setTimeout(checkReact, 100);
             }
-
-            ReactDOM.render(React.createElement(HabitTracker), document.getElementById('root'));
-        }
-
-        initializeApp();
+        };
+        
+        checkReact();
     </script>
 </body>
 </html>
