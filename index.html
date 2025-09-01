@@ -9,8 +9,16 @@
         .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
         .card-hover { transition: all 0.3s ease; }
         .card-hover:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        .bounce-in { animation: bounceIn 0.6s ease-out; }
+        @keyframes bounceIn { 0% { transform: scale(0.3); opacity: 0; } 50% { transform: scale(1.05); } 70% { transform: scale(0.9); } 100% { transform: scale(1); opacity: 1; } }
         .celebration { animation: celebration 1s ease-out; }
         @keyframes celebration { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+        .blur-overlay { backdrop-filter: blur(4px); }
+        .pulse-saving { animation: pulse 1s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+        .section-header { background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%); }
+        .fade-in { animation: fadeIn 0.3s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body>
@@ -47,19 +55,22 @@
                         <div class="flex items-center space-x-2">
                             <!-- Auth Buttons (shown when not logged in) -->
                             <div id="auth-buttons">
-                                <button onclick="showAuthModal('login')" class="px-4 py-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors font-medium">Login</button>
-                                <button onclick="showAuthModal('register')" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium">Register</button>
+                                <button onclick="showAuthModal('login')" class="px-5 py-2.5 text-purple-600 hover:bg-purple-50 rounded-lg transition-all duration-200 font-medium border border-purple-200 hover:border-purple-300">Login</button>
+                                <button onclick="showAuthModal('register')" class="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-lg hover:from-purple-700 hover:to-purple-800 transition-all duration-200 font-medium shadow-lg transform hover:scale-105">Register</button>
                             </div>
                             
                             <!-- User Buttons (shown when logged in) -->
                             <div id="user-buttons" style="display: none;">
-                                <button onclick="toggleDataManagement()" class="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors text-sm font-medium">
-                                    📁 Data Management
+                                <button onclick="toggleDataManagement()" class="px-4 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-200 text-sm font-medium shadow-lg">
+                                    <span class="flex items-center space-x-1">
+                                        <span>📁</span>
+                                        <span>Data Management</span>
+                                    </span>
                                 </button>
-                                <button onclick="toggleEditMode()" id="edit-btn" class="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium">
+                                <button onclick="toggleEditMode()" id="edit-btn" class="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-all duration-200 text-sm font-medium shadow-sm">
                                     ⚙️ Edit Activities
                                 </button>
-                                <button onclick="logout()" class="px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors text-sm font-medium">
+                                <button onclick="logout()" class="px-4 py-2.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-all duration-200 text-sm font-medium shadow-sm">
                                     🚪 Logout
                                 </button>
                             </div>
@@ -201,33 +212,38 @@
         </div>
 
         <!-- Auth Modal -->
-        <div id="auth-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" style="display: none;">
-            <div class="bg-white rounded-lg p-6 w-full max-w-md">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 id="auth-title" class="text-xl font-bold text-gray-800">Welcome!</h2>
-                    <button onclick="closeAuthModal()" class="text-gray-500 hover:text-gray-700 text-xl">×</button>
+        <div id="auth-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 backdrop-blur-sm" style="display: none;">
+            <div class="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl fade-in">
+                <div class="flex justify-between items-center mb-6">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
+                            <span class="text-white font-bold">H</span>
+                        </div>
+                        <h2 id="auth-title" class="text-2xl font-bold text-gray-800">Welcome!</h2>
+                    </div>
+                    <button onclick="closeAuthModal()" class="text-gray-400 hover:text-gray-600 text-2xl transition-colors">×</button>
                 </div>
                 
-                <form id="auth-form" class="space-y-4">
+                <form id="auth-form" class="space-y-5">
                     <div id="name-field" style="display: none;">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Name</label>
-                        <input id="auth-name" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Full Name</label>
+                        <input id="auth-name" type="text" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                        <input id="auth-email" type="email" class="w-full px-3 py-2 border border-gray-300 rounded-lg" required>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Email Address</label>
+                        <input id="auth-email" type="email" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all" required>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
-                        <input id="auth-password" type="password" class="w-full px-3 py-2 border border-gray-300 rounded-lg" required>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">Password</label>
+                        <input id="auth-password" type="password" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all" required>
                     </div>
-                    <button type="submit" id="auth-submit" class="w-full py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium">
+                    <button type="submit" id="auth-submit" class="w-full py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-lg hover:from-purple-700 hover:to-purple-800 transition-all duration-200 font-semibold shadow-lg transform hover:scale-105">
                         Login
                     </button>
                 </form>
                 
-                <div class="mt-4 text-center">
-                    <button id="auth-switch" onclick="switchAuthMode()" class="text-purple-600 hover:text-purple-700 text-sm">
+                <div class="mt-6 text-center">
+                    <button id="auth-switch" onclick="switchAuthMode()" class="text-purple-600 hover:text-purple-700 text-sm font-medium transition-colors">
                         Don't have an account? Register here
                     </button>
                 </div>
@@ -235,56 +251,84 @@
         </div>
 
         <!-- Demo Message -->
-        <div id="demo-message" class="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg p-6 shadow-2xl z-50 border-2 border-purple-200 max-w-sm w-full mx-4" style="display: none;">
+        <div id="demo-message" class="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl p-8 shadow-2xl z-50 border-2 border-purple-200 max-w-sm w-full mx-4 fade-in" style="display: none;">
             <div class="text-center">
-                <div class="text-4xl mb-3">🔒</div>
-                <h3 class="text-lg font-bold text-gray-800 mb-2">Account Required</h3>
-                <p class="text-gray-600 mb-4">Having an account will provide a much more customized experience!</p>
+                <div class="w-16 h-16 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <span class="text-2xl text-white">🔒</span>
+                </div>
+                <h3 class="text-xl font-bold text-gray-800 mb-3">Account Required</h3>
+                <p class="text-gray-600 mb-6 leading-relaxed">Having an account will provide a much more customized experience with progress tracking and data sync!</p>
                 <div class="flex space-x-3">
-                    <button onclick="showAuthModal('register')" class="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium">Register</button>
-                    <button onclick="showAuthModal('login')" class="flex-1 px-4 py-2 text-purple-600 border border-purple-300 rounded-lg hover:bg-purple-50 transition-colors font-medium">Login</button>
+                    <button onclick="showAuthModal('register')" class="flex-1 px-4 py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-lg hover:from-purple-700 hover:to-purple-800 transition-all duration-200 font-medium shadow-lg">
+                        Register
+                    </button>
+                    <button onclick="showAuthModal('login')" class="flex-1 px-4 py-3 text-purple-600 border-2 border-purple-300 rounded-lg hover:bg-purple-50 transition-all duration-200 font-medium">
+                        Login
+                    </button>
                 </div>
             </div>
         </div>
 
         <!-- Data Management Panel -->
-        <div id="data-panel" class="fixed right-4 top-20 w-80 bg-white rounded-lg shadow-xl border border-gray-200 z-40 p-4" style="display: none;">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="font-bold text-gray-800">Data Management</h3>
-                <button onclick="toggleDataManagement()" class="text-gray-500 hover:text-gray-700">×</button>
+        <div id="data-panel" class="fixed right-4 top-20 w-80 bg-white rounded-xl shadow-2xl border border-gray-200 z-40 p-6 fade-in" style="display: none;">
+            <div class="flex justify-between items-center mb-6">
+                <div class="flex items-center space-x-2">
+                    <div class="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center">
+                        <span class="text-white text-sm font-bold">📁</span>
+                    </div>
+                    <h3 class="font-bold text-gray-800">Data Management</h3>
+                </div>
+                <button onclick="toggleDataManagement()" class="text-gray-400 hover:text-gray-600 transition-colors text-xl">×</button>
             </div>
             
-            <div class="space-y-4">
-                <div>
-                    <label class="flex items-center space-x-2 mb-2">
-                        <input type="radio" name="dataMode" value="local" checked onchange="setDataMode('local')">
-                        <span class="font-medium">Keep Data Local</span>
+            <div class="space-y-6">
+                <div class="bg-gray-50 rounded-lg p-4">
+                    <label class="flex items-center space-x-3 mb-3 cursor-pointer">
+                        <input type="radio" name="dataMode" value="local" checked onchange="setDataMode('local')" class="text-purple-600">
+                        <div>
+                            <span class="font-semibold text-gray-800">Keep Data Local</span>
+                            <p class="text-xs text-gray-600">Store on your device with backup options</p>
+                        </div>
                     </label>
-                    <p class="text-xs text-gray-600 mb-3 ml-6">Store data on your device with backup/restore options</p>
-                    <div id="local-options" class="ml-6 space-y-2">
-                        <button onclick="exportData()" class="block w-full text-left px-3 py-2 bg-green-50 text-green-700 rounded hover:bg-green-100 transition-colors text-sm">
-                            📥 Export Data
+                    <div id="local-options" class="space-y-2">
+                        <button onclick="exportData()" class="w-full text-left px-4 py-3 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-all duration-200 text-sm font-medium border border-green-200 hover:border-green-300">
+                            <div class="flex items-center space-x-2">
+                                <span>📥</span>
+                                <span>Export Data</span>
+                            </div>
+                            <div class="text-xs text-green-600 mt-1">Download backup file</div>
                         </button>
-                        <label class="block w-full text-left px-3 py-2 bg-purple-50 text-purple-700 rounded hover:bg-purple-100 transition-colors text-sm cursor-pointer">
-                            📤 Import Data
+                        <label class="block w-full text-left px-4 py-3 bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100 transition-all duration-200 text-sm font-medium cursor-pointer border border-purple-200 hover:border-purple-300">
+                            <div class="flex items-center space-x-2">
+                                <span>📤</span>
+                                <span>Import Data</span>
+                            </div>
+                            <div class="text-xs text-purple-600 mt-1">Restore from backup file</div>
                             <input type="file" accept=".json" onchange="importData(event)" class="hidden">
                         </label>
                     </div>
                 </div>
                 
-                <div>
-                    <label class="flex items-center space-x-2 mb-2">
-                        <input type="radio" name="dataMode" value="cloud" onchange="setDataMode('cloud')">
-                        <span class="font-medium">Keep Data on Cloud</span>
+                <div class="bg-gray-50 rounded-lg p-4">
+                    <label class="flex items-center space-x-3 mb-3 cursor-pointer">
+                        <input type="radio" name="dataMode" value="cloud" onchange="setDataMode('cloud')" class="text-purple-600">
+                        <div>
+                            <span class="font-semibold text-gray-800">Keep Data on Cloud</span>
+                            <p class="text-xs text-gray-600">Sync across devices via Supabase</p>
+                        </div>
                     </label>
-                    <p class="text-xs text-gray-600 mb-3 ml-6">Sync data across devices using Supabase</p>
-                    <div id="cloud-options" class="ml-6 space-y-2" style="display: none;">
-                        <input id="cloud-url" type="url" placeholder="Supabase Project URL" class="w-full px-2 py-1 border border-gray-300 rounded text-sm">
-                        <input id="cloud-key" type="password" placeholder="Supabase API Key" class="w-full px-2 py-1 border border-gray-300 rounded text-sm">
-                        <input id="cloud-user" type="text" placeholder="Your User ID" class="w-full px-2 py-1 border border-gray-300 rounded text-sm">
-                        <button onclick="connectCloud()" class="w-full py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm">
+                    <div id="cloud-options" class="space-y-3" style="display: none;">
+                        <div class="space-y-2">
+                            <input id="cloud-url" type="url" placeholder="Supabase Project URL" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all">
+                            <input id="cloud-key" type="password" placeholder="Supabase API Key" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all">
+                            <input id="cloud-user" type="text" placeholder="Your User ID" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all">
+                        </div>
+                        <button onclick="connectCloud()" class="w-full py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-700 hover:to-green-800 transition-all duration-200 text-sm font-semibold shadow-lg">
                             Connect to Cloud
                         </button>
+                        <div class="text-xs text-gray-500 bg-blue-50 p-2 rounded border-l-4 border-blue-400">
+                            💡 <strong>Tip:</strong> Create your Supabase database tables first using the SQL provided in the setup guide.
+                        </div>
                     </div>
                 </div>
             </div>
@@ -624,7 +668,7 @@
                 section.className = 'mb-6';
                 
                 const header = document.createElement('div');
-                header.className = 'bg-gray-50 rounded-lg p-4 cursor-pointer mb-3';
+                header.className = 'section-header rounded-lg p-4 cursor-pointer transition-colors hover:bg-gray-100 mb-3';
                 header.onclick = () => toggleSection(timeOption.value);
                 header.innerHTML = `
                     <div class="flex items-center justify-between">
@@ -649,20 +693,28 @@
                     if (sectionActivities.length === 0) {
                         activitiesDiv.innerHTML = `
                             <div class="text-gray-500 text-center py-8 border-2 border-dashed border-gray-200 rounded-lg">
-                                No ${timeOption.label.toLowerCase()} activities yet. Add some in edit mode!
+                                <div class="text-2xl mb-2">${timeOption.icon}</div>
+                                <p class="text-sm">No ${timeOption.label.toLowerCase()} activities yet</p>
+                                <p class="text-xs">Add some in edit mode!</p>
                             </div>
                         `;
                     } else {
                         sectionActivities.forEach(activity => {
                             const completed = isCompleted(currentDay, activity.id);
                             const activityDiv = document.createElement('div');
-                            activityDiv.className = `relative p-4 rounded-xl card-hover cursor-pointer border-2 transition-all ${completed ? 'border-green-300 bg-green-50' : 'border-gray-200 bg-white'}`;
+                            activityDiv.className = `relative p-4 rounded-xl card-hover cursor-pointer border-2 transition-all ${completed ? 'border-green-300 bg-green-50' : 'border-gray-200 bg-white'} ${!isAuthenticated ? 'opacity-60' : ''}`;
                             activityDiv.onclick = () => !editMode && toggleActivity(currentDay, activity.id);
                             
+                            // Add blur overlay for non-authenticated users
+                            const overlayHtml = !isAuthenticated ? `
+                                <div class="absolute inset-0 bg-white bg-opacity-50 blur-overlay rounded-xl"></div>
+                            ` : '';
+                            
                             activityDiv.innerHTML = `
+                                ${overlayHtml}
                                 <div class="flex items-center justify-between">
                                     <div class="flex items-center space-x-4">
-                                        <div class="w-12 h-12 bg-gradient-to-r from-blue-400 to-blue-600 rounded-full flex items-center justify-center text-white text-xl">
+                                        <div class="w-12 h-12 bg-gradient-to-r from-blue-400 to-blue-600 rounded-full flex items-center justify-center text-white text-xl shadow-lg">
                                             ${activity.icon}
                                         </div>
                                         <div>
@@ -671,8 +723,8 @@
                                     </div>
                                     <div class="flex items-center space-x-3">
                                         ${completed ? 
-                                            '<div class="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-white">✓</div>' :
-                                            '<div class="w-8 h-8 border-2 border-gray-300 rounded-full"></div>'
+                                            '<div class="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-white bounce-in shadow-lg">✓</div>' :
+                                            '<div class="w-8 h-8 border-2 border-gray-300 rounded-full hover:border-gray-400 transition-colors"></div>'
                                         }
                                     </div>
                                 </div>
@@ -690,7 +742,23 @@
             
             // Show celebration if all activities completed
             const allCompleted = activities.length > 0 && activities.every(activity => isCompleted(currentDay, activity.id));
-            document.getElementById('celebration').style.display = allCompleted && isAuthenticated ? 'block' : 'none';
+            const celebrationDiv = document.getElementById('celebration');
+            if (allCompleted && isAuthenticated) {
+                celebrationDiv.style.display = 'block';
+                celebrationDiv.className = 'mt-6 text-center p-6 bg-gradient-to-r from-green-400 via-blue-500 to-purple-600 rounded-xl text-white celebration shadow-2xl';
+                celebrationDiv.innerHTML = `
+                    <div class="text-5xl mb-3">🎉</div>
+                    <h3 class="text-2xl font-bold mb-2">Day ${currentDay} Complete!</h3>
+                    <p class="text-lg opacity-90">You're building amazing habits!</p>
+                    <div class="mt-4 flex justify-center space-x-2">
+                        <span class="text-2xl">🌟</span>
+                        <span class="text-2xl">💪</span>
+                        <span class="text-2xl">🚀</span>
+                    </div>
+                `;
+            } else {
+                celebrationDiv.style.display = 'none';
+            }
         }
 
         function renderEditPanel() {
