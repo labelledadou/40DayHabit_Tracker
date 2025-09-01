@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>40-Day Habit Tracker</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <style>
         .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
         .card-hover { transition: all 0.3s ease; }
@@ -318,17 +319,26 @@
                         </div>
                     </label>
                     <div id="cloud-options" class="space-y-3" style="display: none;">
-                        <div class="space-y-2">
-                            <input id="cloud-url" type="url" placeholder="Supabase Project URL" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all">
-                            <input id="cloud-key" type="password" placeholder="Supabase API Key" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all">
-                            <input id="cloud-user" type="text" placeholder="Your User ID" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all">
+                        <div id="cloud-status" class="text-xs text-gray-500 bg-blue-50 p-2 rounded border-l-4 border-blue-400" style="display: none;">
+                            <span id="cloud-status-text">🔗 Connected to Supabase</span>
                         </div>
-                        <button onclick="connectCloud()" class="w-full py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-700 hover:to-green-800 transition-all duration-200 text-sm font-semibold shadow-lg">
-                            Connect to Cloud
+                        <div id="cloud-form">
+                            <div class="space-y-2">
+                                <input id="cloud-url" type="url" placeholder="https://your-project.supabase.co" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all">
+                                <input id="cloud-key" type="password" placeholder="eyJhbGci... (anon key)" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all">
+                                <input id="cloud-user" type="text" placeholder="Your User ID (e.g., john@email.com)" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all">
+                            </div>
+                            <button id="connect-btn" onclick="connectCloud()" class="w-full py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-700 hover:to-green-800 transition-all duration-200 text-sm font-semibold shadow-lg mt-3">
+                                Connect to Cloud
+                            </button>
+                        </div>
+                        <div class="text-xs text-gray-500 bg-amber-50 p-2 rounded border-l-4 border-amber-400">
+                            <strong>📋 Setup Required:</strong> Create these tables in your Supabase SQL Editor first:
+                            <button onclick="copySupabaseSQL()" class="ml-2 text-amber-600 hover:text-amber-800 underline">Copy SQL</button>
+                        </div>
+                        <button id="disconnect-btn" onclick="disconnectCloud()" class="w-full py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors text-sm font-medium" style="display: none;">
+                            Disconnect from Cloud
                         </button>
-                        <div class="text-xs text-gray-500 bg-blue-50 p-2 rounded border-l-4 border-blue-400">
-                            💡 <strong>Tip:</strong> Create your Supabase database tables first using the SQL provided in the setup guide.
-                        </div>
                     </div>
                 </div>
             </div>
@@ -346,6 +356,9 @@
         let progress = {};
         let collapsedSections = {};
         let editingActivity = null;
+        let supabase = null;
+        let isCloudConnected = false;
+        let cloudUserId = null;
         
         let activities = [
             { id: 1, name: 'Morning Exercise', icon: '🏃‍♂️', timeOfDay: 'morning' },
@@ -464,6 +477,7 @@
             
             if (!progress[day]) progress[day] = {};
             progress[day][activityId] = !progress[day][activityId];
+            autoSaveToCloud();
             renderAll();
         }
 
@@ -514,6 +528,7 @@
 
         function stopEditingActivity() {
             editingActivity = null;
+            autoSaveToCloud();
             renderAll();
         }
 
@@ -521,6 +536,7 @@
             const activityIndex = activities.findIndex(a => a.id === activityId);
             if (activityIndex !== -1) {
                 activities[activityIndex][field] = value;
+                autoSaveToCloud();
                 renderAll();
             }
         }
@@ -540,15 +556,19 @@
             });
             
             document.getElementById('new-name').value = '';
+            autoSaveToCloud();
             renderAll();
         }
 
         function deleteActivity(id) {
             if (!requireAuth()) return;
+            if (!confirm('Are you sure you want to delete this activity? All progress will be lost.')) return;
+            
             activities = activities.filter(a => a.id !== id);
             Object.keys(progress).forEach(day => {
                 if (progress[day][id]) delete progress[day][id];
             });
+            autoSaveToCloud();
             renderAll();
         }
 
@@ -568,6 +588,7 @@
                 [activities[activityIndex], activities[targetIndex]] = [activities[targetIndex], activities[activityIndex]];
             }
             
+            autoSaveToCloud();
             renderAll();
         }
 
@@ -575,6 +596,7 @@
             if (!requireAuth()) return;
             const activityIndex = activities.findIndex(a => a.id === id);
             activities[activityIndex].timeOfDay = newTimeOfDay;
+            autoSaveToCloud();
             renderAll();
         }
 
@@ -603,6 +625,9 @@
         function setDataMode(mode) {
             document.getElementById('local-options').style.display = mode === 'local' ? 'block' : 'none';
             document.getElementById('cloud-options').style.display = mode === 'cloud' ? 'block' : 'none';
+            if (mode === 'cloud') {
+                updateCloudUI();
+            }
         }
 
         function exportData() {
@@ -640,7 +665,240 @@
         }
 
         function connectCloud() {
-            alert('Cloud connection demo - would connect to Supabase in production');
+            const url = document.getElementById('cloud-url').value.trim();
+            const key = document.getElementById('cloud-key').value.trim();
+            const userId = document.getElementById('cloud-user').value.trim();
+            
+            if (!url || !key || !userId) {
+                alert('Please fill in all fields (URL, API Key, and User ID)');
+                return;
+            }
+            
+            try {
+                // Initialize Supabase client
+                supabase = window.supabase.createClient(url, key);
+                cloudUserId = userId;
+                isCloudConnected = true;
+                
+                // Test the connection and load existing data
+                loadFromCloud().then(() => {
+                    alert('Connected to Supabase successfully! Your data has been synced.');
+                    renderAll();
+                    toggleDataManagement(); // Close the panel
+                }).catch(error => {
+                    console.error('Error loading data from cloud:', error);
+                    // Still mark as connected since connection works, just no data yet
+                    alert('Connected to Supabase! Ready to sync your data.');
+                    saveToCloud(); // Save current data as initial sync
+                    toggleDataManagement();
+                });
+                
+            } catch (error) {
+                console.error('Error connecting to Supabase:', error);
+                alert('Error connecting to Supabase. Please check your URL and API key.');
+                isCloudConnected = false;
+                supabase = null;
+            }
+        }
+
+        async function saveToCloud() {
+            if (!supabase || !isCloudConnected || !cloudUserId) return;
+            
+            try {
+                // Save activities
+                const { error: activitiesError } = await supabase
+                    .from('habit_activities')
+                    .upsert(
+                        activities.map((activity, index) => ({
+                            id: activity.id,
+                            user_id: cloudUserId,
+                            name: activity.name,
+                            color: 'bg-gradient-to-r from-blue-400 to-blue-600', // default color
+                            icon: activity.icon,
+                            time_of_day: activity.timeOfDay,
+                            order_index: index
+                        }))
+                    );
+                
+                if (activitiesError) throw activitiesError;
+
+                // Save progress
+                const progressEntries = [];
+                Object.keys(progress).forEach(day => {
+                    Object.keys(progress[day]).forEach(activityId => {
+                        if (progress[day][activityId]) {
+                            progressEntries.push({
+                                user_id: cloudUserId,
+                                day: parseInt(day),
+                                activity_id: parseInt(activityId),
+                                completed: true
+                            });
+                        }
+                    });
+                });
+
+                if (progressEntries.length > 0) {
+                    const { error: progressError } = await supabase
+                        .from('habit_progress')
+                        .upsert(progressEntries);
+                    
+                    if (progressError) throw progressError;
+                }
+
+                // Save user settings
+                const { error: settingsError } = await supabase
+                    .from('user_settings')
+                    .upsert({
+                        user_id: cloudUserId,
+                        current_day: currentDay
+                    });
+                
+                if (settingsError) throw settingsError;
+                
+                console.log('Data saved to cloud successfully');
+                
+            } catch (error) {
+                console.error('Error saving to cloud:', error);
+                alert('Error saving to cloud. Please check your connection.');
+            }
+        }
+
+        async function loadFromCloud() {
+            if (!supabase || !isCloudConnected || !cloudUserId) return;
+            
+            try {
+                // Load activities
+                const { data: activitiesData, error: activitiesError } = await supabase
+                    .from('habit_activities')
+                    .select('*')
+                    .eq('user_id', cloudUserId)
+                    .order('order_index');
+                
+                if (activitiesError) throw activitiesError;
+                
+                if (activitiesData && activitiesData.length > 0) {
+                    activities = activitiesData.map(item => ({
+                        id: item.id,
+                        name: item.name,
+                        icon: item.icon,
+                        timeOfDay: item.time_of_day
+                    }));
+                }
+
+                // Load progress
+                const { data: progressData, error: progressError } = await supabase
+                    .from('habit_progress')
+                    .select('*')
+                    .eq('user_id', cloudUserId);
+                
+                if (progressError) throw progressError;
+                
+                progress = {};
+                if (progressData) {
+                    progressData.forEach(item => {
+                        if (!progress[item.day]) progress[item.day] = {};
+                        progress[item.day][item.activity_id] = item.completed;
+                    });
+                }
+
+                // Load settings
+                const { data: settingsData, error: settingsError } = await supabase
+                    .from('user_settings')
+                    .select('*')
+                    .eq('user_id', cloudUserId)
+                    .single();
+                
+                if (settingsError && settingsError.code !== 'PGRST116') throw settingsError;
+                
+                if (settingsData) {
+                    currentDay = settingsData.current_day || 1;
+                }
+                
+            } catch (error) {
+                console.error('Error loading from cloud:', error);
+                throw error;
+            }
+        }
+
+        // Auto-save when data changes
+        function autoSaveToCloud() {
+            if (isCloudConnected) {
+                setTimeout(() => saveToCloud(), 1000); // Debounce saves by 1 second
+            }
+        }
+
+        function disconnectCloud() {
+            if (confirm('Are you sure you want to disconnect from cloud? Your local data will remain, but changes won\'t sync.')) {
+                supabase = null;
+                isCloudConnected = false;
+                cloudUserId = null;
+                updateCloudUI();
+                alert('Disconnected from cloud. Your data is still available locally.');
+            }
+        }
+
+        function copySupabaseSQL() {
+            const sql = `-- Copy and run this SQL in your Supabase SQL Editor
+-- Table for storing your activities
+CREATE TABLE habit_activities (
+  id bigint PRIMARY KEY,
+  user_id text NOT NULL,
+  name text NOT NULL,
+  color text NOT NULL,
+  icon text NOT NULL,
+  time_of_day text NOT NULL,
+  order_index integer NOT NULL,
+  created_at timestamp with time zone DEFAULT now()
+);
+
+-- Table for storing your daily progress
+CREATE TABLE habit_progress (
+  user_id text NOT NULL,
+  day integer NOT NULL,
+  activity_id bigint NOT NULL,
+  completed boolean NOT NULL,
+  updated_at timestamp with time zone DEFAULT now(),
+  PRIMARY KEY (user_id, day, activity_id)
+);
+
+-- Table for your settings
+CREATE TABLE user_settings (
+  user_id text PRIMARY KEY,
+  current_day integer DEFAULT 1,
+  updated_at timestamp with time zone DEFAULT now()
+);`;
+
+            navigator.clipboard.writeText(sql).then(() => {
+                alert('SQL copied to clipboard! Paste this in your Supabase SQL Editor and run it.');
+            }).catch(() => {
+                // Fallback for browsers that don't support clipboard API
+                const textArea = document.createElement('textarea');
+                textArea.value = sql;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                alert('SQL copied to clipboard! Paste this in your Supabase SQL Editor and run it.');
+            });
+        }
+
+        function updateCloudUI() {
+            const cloudStatus = document.getElementById('cloud-status');
+            const cloudForm = document.getElementById('cloud-form');
+            const connectBtn = document.getElementById('connect-btn');
+            const disconnectBtn = document.getElementById('disconnect-btn');
+            const cloudStatusText = document.getElementById('cloud-status-text');
+
+            if (isCloudConnected) {
+                cloudStatus.style.display = 'block';
+                cloudForm.style.display = 'none';
+                disconnectBtn.style.display = 'block';
+                cloudStatusText.textContent = `🔗 Connected as ${cloudUserId}`;
+            } else {
+                cloudStatus.style.display = 'none';
+                cloudForm.style.display = 'block';
+                disconnectBtn.style.display = 'none';
+            }
         }
 
         // Rendering functions
@@ -703,6 +961,7 @@
                 button.onclick = () => {
                     if (requireAuth()) {
                         currentDay = day;
+                        autoSaveToCloud();
                         renderAll();
                     }
                 };
