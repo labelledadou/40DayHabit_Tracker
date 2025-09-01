@@ -4,1208 +4,768 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>40-Day Habit Tracker</title>
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        .gradient-bg {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        }
-        .card-hover {
-            transition: all 0.3s ease;
-        }
-        .card-hover:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-        }
-        .bounce-in {
-            animation: bounceIn 0.6s ease-out;
-        }
-        @keyframes bounceIn {
-            0% { transform: scale(0.3); opacity: 0; }
-            50% { transform: scale(1.05); }
-            70% { transform: scale(0.9); }
-            100% { transform: scale(1); opacity: 1; }
-        }
-        .celebration {
-            animation: celebration 1s ease-out;
-        }
-        @keyframes celebration {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.1); }
-            100% { transform: scale(1); }
-        }
-        .blur-overlay {
-            backdrop-filter: blur(4px);
-        }
-        .dragging {
-            opacity: 0.5;
-            transform: rotate(5deg);
-        }
-        .drag-over {
-            border: 2px dashed #3b82f6;
-            background-color: #eff6ff;
-        }
-        .section-header {
-            background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
-        }
+        .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .card-hover { transition: all 0.3s ease; }
+        .card-hover:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        .celebration { animation: celebration 1s ease-out; }
+        @keyframes celebration { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
     </style>
 </head>
 <body>
-    <div id="root">
-        <div class="min-h-screen gradient-bg flex items-center justify-center p-4">
+    <div id="app" class="min-h-screen gradient-bg">
+        <!-- Loading Screen -->
+        <div id="loading" class="min-h-screen flex items-center justify-center">
             <div class="bg-white rounded-lg p-8 text-center">
                 <div class="animate-spin w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full mx-auto mb-4"></div>
-                <p class="text-gray-600">Building your personalized habit tracker... ⏳</p>
+                <p class="text-gray-600">Building your personalized habit tracker...</p>
+            </div>
+        </div>
+        
+        <!-- Main App (hidden initially) -->
+        <div id="main-app" style="display: none;">
+            <!-- Demo Banner -->
+            <div id="demo-banner" class="bg-amber-100 border-b border-amber-200 px-4 py-2 text-center">
+                <span class="text-amber-800 text-sm font-medium">
+                    🌟 Demo Mode - Create an account for full personalization and progress tracking!
+                </span>
+            </div>
+
+            <!-- Header -->
+            <div class="bg-white shadow-lg">
+                <div class="max-w-6xl mx-auto px-6 py-4">
+                    <div class="flex justify-between items-center">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
+                                <span class="text-white font-bold">H</span>
+                            </div>
+                            <h1 class="text-2xl font-bold text-gray-800">40-Day Habit Tracker</h1>
+                            <span id="user-welcome" class="text-sm text-gray-600" style="display: none;"></span>
+                        </div>
+                        
+                        <div class="flex items-center space-x-2">
+                            <!-- Auth Buttons (shown when not logged in) -->
+                            <div id="auth-buttons">
+                                <button onclick="showAuthModal('login')" class="px-4 py-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors font-medium">Login</button>
+                                <button onclick="showAuthModal('register')" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium">Register</button>
+                            </div>
+                            
+                            <!-- User Buttons (shown when logged in) -->
+                            <div id="user-buttons" style="display: none;">
+                                <button onclick="toggleDataManagement()" class="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors text-sm font-medium">
+                                    📁 Data Management
+                                </button>
+                                <button onclick="toggleEditMode()" id="edit-btn" class="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium">
+                                    ⚙️ Edit Activities
+                                </button>
+                                <button onclick="logout()" class="px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors text-sm font-medium">
+                                    🚪 Logout
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="max-w-6xl mx-auto p-6">
+                <!-- Stats Overview -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <div class="bg-white rounded-xl shadow-lg p-6 card-hover">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-gray-600">Overall Progress</p>
+                                <p id="overall-progress" class="text-3xl font-bold text-purple-600">0%</p>
+                            </div>
+                            <div class="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
+                                <span class="text-2xl">📊</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white rounded-xl shadow-lg p-6 card-hover">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-gray-600">Current Day</p>
+                                <p id="current-day-stat" class="text-3xl font-bold text-blue-600">1/40</p>
+                            </div>
+                            <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                                <span class="text-2xl">📅</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white rounded-xl shadow-lg p-6 card-hover">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-gray-600">Perfect Days</p>
+                                <p id="perfect-days" class="text-3xl font-bold text-green-600">0</p>
+                            </div>
+                            <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                                <span class="text-2xl">🏆</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Edit Mode Panel -->
+                <div id="edit-panel" class="bg-white rounded-xl shadow-lg mb-8" style="display: none;">
+                    <div class="p-6 border-b border-gray-200">
+                        <h2 class="text-xl font-bold text-gray-800">Manage Activities</h2>
+                    </div>
+                    <div class="grid grid-cols-1 lg:grid-cols-5 gap-0 min-h-[400px]">
+                        <!-- Left Panel -->
+                        <div class="lg:col-span-2 bg-gray-50 p-6 border-r border-gray-200">
+                            <div class="space-y-6">
+                                <!-- Add New Activity -->
+                                <div class="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
+                                    <h3 class="font-semibold text-gray-800 mb-4">Add New Activity</h3>
+                                    <div class="space-y-3">
+                                        <select id="new-icon" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                                            <option value="✨">✨ Sparkles</option>
+                                            <option value="🏃‍♂️">🏃‍♂️ Exercise</option>
+                                            <option value="📚">📚 Reading</option>
+                                            <option value="🧘‍♀️">🧘‍♀️ Meditation</option>
+                                            <option value="💧">💧 Water</option>
+                                            <option value="✍️">✍️ Writing</option>
+                                            <option value="🍎">🍎 Healthy Food</option>
+                                            <option value="💪">💪 Strength</option>
+                                            <option value="☀️">☀️ Sun</option>
+                                            <option value="🌙">🌙 Moon</option>
+                                        </select>
+                                        <select id="new-time" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                                            <option value="morning">🌅 Morning</option>
+                                            <option value="midday">☀️ Mid-day</option>
+                                            <option value="evening">🌙 Evening</option>
+                                        </select>
+                                        <input id="new-name" type="text" placeholder="Activity name..." class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                                        <button onclick="addActivity()" class="w-full py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium">
+                                            ➕ Add Activity
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Quick Stats -->
+                                <div class="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
+                                    <h3 class="font-semibold text-gray-800 mb-3">Activity Stats</h3>
+                                    <div id="activity-stats" class="space-y-2 text-sm"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right Panel -->
+                        <div class="lg:col-span-3 p-6">
+                            <h3 class="font-semibold text-gray-800 mb-4">Your Activities</h3>
+                            <div id="edit-activities-list"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Day Selector -->
+                <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
+                    <h2 class="text-xl font-bold text-gray-800 mb-4">40-Day Journey</h2>
+                    <div id="day-grid" class="grid grid-cols-8 gap-2 mb-4"></div>
+                    <div class="flex items-center gap-4 text-sm text-gray-600">
+                        <div class="flex items-center gap-2">
+                            <div class="w-4 h-4 bg-gray-100 rounded"></div>
+                            <span>Not Started</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="w-4 h-4 bg-yellow-400 rounded"></div>
+                            <span>In Progress</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="w-4 h-4 bg-green-500 rounded"></div>
+                            <span>Complete</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Daily Activities -->
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <div class="flex items-center justify-between mb-6">
+                        <h2 id="day-title" class="text-2xl font-bold text-gray-800">Day 1 Activities</h2>
+                        <div id="day-progress" class="text-sm text-gray-600">0 / 0 completed</div>
+                    </div>
+                    
+                    <div id="activities-container"></div>
+                    
+                    <!-- Completion Celebration -->
+                    <div id="celebration" class="mt-6 text-center p-4 bg-gradient-to-r from-green-400 to-blue-500 rounded-xl text-white celebration" style="display: none;">
+                        <div class="text-4xl mb-2">🎉</div>
+                        <h3 class="text-xl font-bold">Day Complete!</h3>
+                        <p>You're building amazing habits!</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Auth Modal -->
+        <div id="auth-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" style="display: none;">
+            <div class="bg-white rounded-lg p-6 w-full max-w-md">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 id="auth-title" class="text-xl font-bold text-gray-800">Welcome!</h2>
+                    <button onclick="closeAuthModal()" class="text-gray-500 hover:text-gray-700 text-xl">×</button>
+                </div>
+                
+                <form id="auth-form" class="space-y-4">
+                    <div id="name-field" style="display: none;">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                        <input id="auth-name" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                        <input id="auth-email" type="email" class="w-full px-3 py-2 border border-gray-300 rounded-lg" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                        <input id="auth-password" type="password" class="w-full px-3 py-2 border border-gray-300 rounded-lg" required>
+                    </div>
+                    <button type="submit" id="auth-submit" class="w-full py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium">
+                        Login
+                    </button>
+                </form>
+                
+                <div class="mt-4 text-center">
+                    <button id="auth-switch" onclick="switchAuthMode()" class="text-purple-600 hover:text-purple-700 text-sm">
+                        Don't have an account? Register here
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Demo Message -->
+        <div id="demo-message" class="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg p-6 shadow-2xl z-50 border-2 border-purple-200 max-w-sm w-full mx-4" style="display: none;">
+            <div class="text-center">
+                <div class="text-4xl mb-3">🔒</div>
+                <h3 class="text-lg font-bold text-gray-800 mb-2">Account Required</h3>
+                <p class="text-gray-600 mb-4">Having an account will provide a much more customized experience!</p>
+                <div class="flex space-x-3">
+                    <button onclick="showAuthModal('register')" class="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium">Register</button>
+                    <button onclick="showAuthModal('login')" class="flex-1 px-4 py-2 text-purple-600 border border-purple-300 rounded-lg hover:bg-purple-50 transition-colors font-medium">Login</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Management Panel -->
+        <div id="data-panel" class="fixed right-4 top-20 w-80 bg-white rounded-lg shadow-xl border border-gray-200 z-40 p-4" style="display: none;">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-bold text-gray-800">Data Management</h3>
+                <button onclick="toggleDataManagement()" class="text-gray-500 hover:text-gray-700">×</button>
+            </div>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="flex items-center space-x-2 mb-2">
+                        <input type="radio" name="dataMode" value="local" checked onchange="setDataMode('local')">
+                        <span class="font-medium">Keep Data Local</span>
+                    </label>
+                    <p class="text-xs text-gray-600 mb-3 ml-6">Store data on your device with backup/restore options</p>
+                    <div id="local-options" class="ml-6 space-y-2">
+                        <button onclick="exportData()" class="block w-full text-left px-3 py-2 bg-green-50 text-green-700 rounded hover:bg-green-100 transition-colors text-sm">
+                            📥 Export Data
+                        </button>
+                        <label class="block w-full text-left px-3 py-2 bg-purple-50 text-purple-700 rounded hover:bg-purple-100 transition-colors text-sm cursor-pointer">
+                            📤 Import Data
+                            <input type="file" accept=".json" onchange="importData(event)" class="hidden">
+                        </label>
+                    </div>
+                </div>
+                
+                <div>
+                    <label class="flex items-center space-x-2 mb-2">
+                        <input type="radio" name="dataMode" value="cloud" onchange="setDataMode('cloud')">
+                        <span class="font-medium">Keep Data on Cloud</span>
+                    </label>
+                    <p class="text-xs text-gray-600 mb-3 ml-6">Sync data across devices using Supabase</p>
+                    <div id="cloud-options" class="ml-6 space-y-2" style="display: none;">
+                        <input id="cloud-url" type="url" placeholder="Supabase Project URL" class="w-full px-2 py-1 border border-gray-300 rounded text-sm">
+                        <input id="cloud-key" type="password" placeholder="Supabase API Key" class="w-full px-2 py-1 border border-gray-300 rounded text-sm">
+                        <input id="cloud-user" type="text" placeholder="Your User ID" class="w-full px-2 py-1 border border-gray-300 rounded text-sm">
+                        <button onclick="connectCloud()" class="w-full py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm">
+                            Connect to Cloud
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
-    <script type="text/babel">
-        const { useState, useEffect } = React;
+    <script>
+        // Global state
+        let currentDay = 1;
+        let isAuthenticated = false;
+        let currentUser = null;
+        let editMode = false;
+        let authMode = 'login';
+        let users = [];
+        let progress = {};
+        let collapsedSections = {};
+        
+        let activities = [
+            { id: 1, name: 'Morning Exercise', icon: '🏃‍♂️', timeOfDay: 'morning' },
+            { id: 2, name: 'Healthy Breakfast', icon: '🍎', timeOfDay: 'morning' },
+            { id: 3, name: 'Read 30 Minutes', icon: '📚', timeOfDay: 'midday' },
+            { id: 4, name: 'Drink Water', icon: '💧', timeOfDay: 'midday' },
+            { id: 5, name: 'Meditate', icon: '🧘‍♀️', timeOfDay: 'evening' },
+            { id: 6, name: 'Journal', icon: '✍️', timeOfDay: 'evening' }
+        ];
 
-        const HabitTracker = () => {
-            // Authentication state
-            const [isAuthenticated, setIsAuthenticated] = useState(false);
-            const [currentUser, setCurrentUser] = useState(null);
-            const [showAuthModal, setShowAuthModal] = useState(false);
-            const [authMode, setAuthMode] = useState('login');
-            const [authForm, setAuthForm] = useState({ email: '', password: '', name: '' });
+        const timeOptions = [
+            { value: 'morning', label: 'Morning', icon: '🌅' },
+            { value: 'midday', label: 'Mid-day', icon: '☀️' },
+            { value: 'evening', label: 'Evening', icon: '🌙' }
+        ];
 
-            // App state
-            const [currentDay, setCurrentDay] = useState(1);
-            const [activities, setActivities] = useState([
-                { id: 1, name: 'Morning Exercise', icon: '🏃‍♂️', color: 'bg-gradient-to-r from-blue-400 to-blue-600', timeOfDay: 'morning' },
-                { id: 2, name: 'Healthy Breakfast', icon: '🍎', color: 'bg-gradient-to-r from-green-400 to-green-600', timeOfDay: 'morning' },
-                { id: 3, name: 'Read 30 Minutes', icon: '📚', color: 'bg-gradient-to-r from-purple-400 to-purple-600', timeOfDay: 'midday' },
-                { id: 4, name: 'Drink Water', icon: '💧', color: 'bg-gradient-to-r from-cyan-400 to-cyan-600', timeOfDay: 'midday' },
-                { id: 5, name: 'Meditate', icon: '🧘‍♀️', color: 'bg-gradient-to-r from-indigo-400 to-indigo-600', timeOfDay: 'evening' },
-                { id: 6, name: 'Journal', icon: '✍️', color: 'bg-gradient-to-r from-amber-400 to-amber-600', timeOfDay: 'evening' }
-            ]);
+        // Initialize app
+        setTimeout(() => {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('main-app').style.display = 'block';
+            renderAll();
+        }, 1000);
 
-            // UI state
-            const [progress, setProgress] = useState({});
-            const [editMode, setEditMode] = useState(false);
-            const [newActivity, setNewActivity] = useState({ name: '', icon: '✨', timeOfDay: 'morning' });
-            const [editingActivity, setEditingActivity] = useState(null);
-            const [showDemoMessage, setShowDemoMessage] = useState(false);
-            const [collapsedSections, setCollapsedSections] = useState({});
-            const [draggedActivity, setDraggedActivity] = useState(null);
-            const [showDataManagement, setShowDataManagement] = useState(false);
-            const [dataMode, setDataMode] = useState('local'); // 'local' or 'cloud'
+        // Authentication functions
+        function showAuthModal(mode) {
+            authMode = mode;
+            document.getElementById('auth-modal').style.display = 'flex';
+            document.getElementById('auth-title').textContent = mode === 'login' ? 'Welcome Back!' : 'Create Account';
+            document.getElementById('name-field').style.display = mode === 'register' ? 'block' : 'none';
+            document.getElementById('auth-submit').textContent = mode === 'login' ? 'Login' : 'Create Account';
+            document.getElementById('auth-switch').textContent = mode === 'login' 
+                ? "Don't have an account? Register here" 
+                : "Already have an account? Login here";
+        }
 
-            // Cloud sync
-            const [isCloudConnected, setIsCloudConnected] = useState(false);
-            const [cloudConfig, setCloudConfig] = useState({ url: '', key: '', userId: '' });
+        function closeAuthModal() {
+            document.getElementById('auth-modal').style.display = 'none';
+            document.getElementById('auth-form').reset();
+        }
 
-            // Demo users storage
-            const [users, setUsers] = useState([]);
+        function switchAuthMode() {
+            showAuthModal(authMode === 'login' ? 'register' : 'login');
+        }
 
-            const iconOptions = ['✨', '🏃‍♂️', '📚', '🧘‍♀️', '💧', '✍️', '🍎', '💪', '🎯', '🌱', '🎵', '🔥', '⭐', '🚀', '💝', '☀️', '🌙', '⚡'];
-            const colorOptions = [
-                'bg-gradient-to-r from-blue-400 to-blue-600',
-                'bg-gradient-to-r from-green-400 to-green-600',
-                'bg-gradient-to-r from-purple-400 to-purple-600',
-                'bg-gradient-to-r from-pink-400 to-pink-600',
-                'bg-gradient-to-r from-amber-400 to-amber-600',
-                'bg-gradient-to-r from-cyan-400 to-cyan-600',
-                'bg-gradient-to-r from-red-400 to-red-600',
-                'bg-gradient-to-r from-indigo-400 to-indigo-600'
-            ];
+        document.getElementById('auth-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const email = document.getElementById('auth-email').value;
+            const password = document.getElementById('auth-password').value;
+            const name = document.getElementById('auth-name').value;
 
-            const timeOfDayOptions = [
-                { value: 'morning', label: 'Morning', icon: '🌅' },
-                { value: 'midday', label: 'Mid-day', icon: '☀️' },
-                { value: 'evening', label: 'Evening', icon: '🌙' }
-            ];
-
-            const supabaseSQL = `-- Copy and run this SQL in your Supabase SQL Editor
--- Table for storing your activities
-CREATE TABLE habit_activities (
-  id bigint PRIMARY KEY,
-  user_id text NOT NULL,
-  name text NOT NULL,
-  color text NOT NULL,
-  icon text NOT NULL,
-  time_of_day text NOT NULL,
-  order_index integer NOT NULL,
-  created_at timestamp with time zone DEFAULT now()
-);
-
--- Table for storing your daily progress
-CREATE TABLE habit_progress (
-  user_id text NOT NULL,
-  day integer NOT NULL,
-  activity_id bigint NOT NULL,
-  completed boolean NOT NULL,
-  updated_at timestamp with time zone DEFAULT now(),
-  PRIMARY KEY (user_id, day, activity_id)
-);
-
--- Table for your settings
-CREATE TABLE user_settings (
-  user_id text PRIMARY KEY,
-  current_day integer DEFAULT 1,
-  updated_at timestamp with time zone DEFAULT now()
-);`;
-
-            // Authentication functions
-            const handleAuth = (e) => {
-                e.preventDefault();
-                if (authMode === 'register') {
-                    const newUser = {
-                        id: Date.now(),
-                        email: authForm.email,
-                        name: authForm.name,
-                        activities: [...activities],
-                        progress: {},
-                        currentDay: 1
-                    };
-                    setUsers([...users, newUser]);
-                    setCurrentUser(newUser);
-                    setIsAuthenticated(true);
-                } else {
-                    const existingUser = users.find(u => u.email === authForm.email);
-                    if (existingUser) {
-                        setCurrentUser(existingUser);
-                        setActivities(existingUser.activities);
-                        setProgress(existingUser.progress);
-                        setCurrentDay(existingUser.currentDay);
-                        setIsAuthenticated(true);
-                    } else {
-                        alert('User not found. Please register first.');
-                        return;
-                    }
-                }
-                setShowAuthModal(false);
-                setAuthForm({ email: '', password: '', name: '' });
-            };
-
-            const handleLogout = () => {
-                setIsAuthenticated(false);
-                setCurrentUser(null);
-                setProgress({});
-                setCurrentDay(1);
-                setActivities([
-                    { id: 1, name: 'Morning Exercise', icon: '🏃‍♂️', color: 'bg-gradient-to-r from-blue-400 to-blue-600', timeOfDay: 'morning' },
-                    { id: 2, name: 'Healthy Breakfast', icon: '🍎', color: 'bg-gradient-to-r from-green-400 to-green-600', timeOfDay: 'morning' },
-                    { id: 3, name: 'Read 30 Minutes', icon: '📚', color: 'bg-gradient-to-r from-purple-400 to-purple-600', timeOfDay: 'midday' },
-                    { id: 4, name: 'Drink Water', icon: '💧', color: 'bg-gradient-to-r from-cyan-400 to-cyan-600', timeOfDay: 'midday' },
-                    { id: 5, name: 'Meditate', icon: '🧘‍♀️', color: 'bg-gradient-to-r from-indigo-400 to-indigo-600', timeOfDay: 'evening' },
-                    { id: 6, name: 'Journal', icon: '✍️', color: 'bg-gradient-to-r from-amber-400 to-amber-600', timeOfDay: 'evening' }
-                ]);
-            };
-
-            const requireAuth = () => {
-                if (!isAuthenticated) {
-                    setShowDemoMessage(true);
-                    setTimeout(() => setShowDemoMessage(false), 3000);
-                    return false;
-                }
-                return true;
-            };
-
-            // Activity management functions
-            const isActivityCompleted = (day, activityId) => {
-                return progress[day]?.[activityId] || false;
-            };
-
-            const toggleActivity = (day, activityId) => {
-                if (!requireAuth()) return;
-                
-                setProgress(prev => ({
-                    ...prev,
-                    [day]: {
-                        ...prev[day],
-                        [activityId]: !prev[day]?.[activityId]
-                    }
-                }));
-            };
-
-            const getActivitiesByTimeOfDay = (timeOfDay) => {
-                return activities.filter(activity => activity.timeOfDay === timeOfDay);
-            };
-
-            const addActivity = () => {
-                if (!requireAuth()) return;
-                if (newActivity.name.trim()) {
-                    const newId = Math.max(...activities.map(a => a.id), 0) + 1;
-                    const randomColor = colorOptions[Math.floor(Math.random() * colorOptions.length)];
-                    setActivities([...activities, {
-                        id: newId,
-                        name: newActivity.name.trim(),
-                        icon: newActivity.icon,
-                        color: randomColor,
-                        timeOfDay: newActivity.timeOfDay
-                    }]);
-                    setNewActivity({ name: '', icon: '✨', timeOfDay: 'morning' });
-                }
-            };
-
-            const deleteActivity = (id) => {
-                if (!requireAuth()) return;
-                setActivities(activities.filter(a => a.id !== id));
-                const newProgress = { ...progress };
-                Object.keys(newProgress).forEach(day => {
-                    if (newProgress[day][id]) {
-                        delete newProgress[day][id];
-                    }
-                });
-                setProgress(newProgress);
-            };
-
-            const moveActivity = (id, direction) => {
-                if (!requireAuth()) return;
-                const activity = activities.find(a => a.id === id);
-                const sameTimeActivities = activities.filter(a => a.timeOfDay === activity.timeOfDay);
-                const currentIndex = sameTimeActivities.findIndex(a => a.id === id);
-                
-                if (direction === 'up' && currentIndex > 0) {
-                    const newActivities = [...activities];
-                    const activityIndex = newActivities.findIndex(a => a.id === id);
-                    const targetActivity = sameTimeActivities[currentIndex - 1];
-                    const targetIndex = newActivities.findIndex(a => a.id === targetActivity.id);
-                    
-                    // Swap positions
-                    [newActivities[activityIndex], newActivities[targetIndex]] = 
-                    [newActivities[targetIndex], newActivities[activityIndex]];
-                    
-                    setActivities(newActivities);
-                } else if (direction === 'down' && currentIndex < sameTimeActivities.length - 1) {
-                    const newActivities = [...activities];
-                    const activityIndex = newActivities.findIndex(a => a.id === id);
-                    const targetActivity = sameTimeActivities[currentIndex + 1];
-                    const targetIndex = newActivities.findIndex(a => a.id === targetActivity.id);
-                    
-                    // Swap positions
-                    [newActivities[activityIndex], newActivities[targetIndex]] = 
-                    [newActivities[targetIndex], newActivities[activityIndex]];
-                    
-                    setActivities(newActivities);
-                }
-            };
-
-            const moveActivityToSection = (id, newTimeOfDay) => {
-                if (!requireAuth()) return;
-                const newActivities = activities.map(a =>
-                    a.id === id ? { ...a, timeOfDay: newTimeOfDay } : a
-                );
-                setActivities(newActivities);
-            };
-
-            // Data management functions
-            const exportData = () => {
-                if (!requireAuth()) return;
-                const data = {
-                    activities,
-                    progress,
-                    currentDay,
-                    exportDate: new Date().toISOString()
+            if (authMode === 'register') {
+                const newUser = {
+                    id: Date.now(),
+                    email,
+                    name: name || email,
+                    activities: [...activities],
+                    progress: {},
+                    currentDay: 1
                 };
-                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `40-day-tracker-${new Date().toISOString().split('T')[0]}.json`;
-                a.click();
-                URL.revokeObjectURL(url);
-            };
-
-            const importData = (event) => {
-                if (!requireAuth()) return;
-                const file = event.target.files[0];
-                if (file && file.type === 'application/json') {
-                    const reader = new FileReader();
-                    reader.onload = (e) => {
-                        try {
-                            const data = JSON.parse(e.target.result);
-                            setActivities(data.activities || activities);
-                            setProgress(data.progress || {});
-                            setCurrentDay(data.currentDay || 1);
-                            alert('Data imported successfully!');
-                        } catch (error) {
-                            alert('Error importing data. Please check the file format.');
-                        }
-                    };
-                    reader.readAsText(file);
+                users.push(newUser);
+                currentUser = newUser;
+                isAuthenticated = true;
+            } else {
+                const user = users.find(u => u.email === email);
+                if (user) {
+                    currentUser = user;
+                    activities = user.activities;
+                    progress = user.progress;
+                    currentDay = user.currentDay;
+                    isAuthenticated = true;
+                } else {
+                    alert('User not found. Please register first.');
+                    return;
                 }
-                event.target.value = '';
-            };
+            }
+            
+            closeAuthModal();
+            renderAll();
+        });
 
-            const connectToCloud = async () => {
-                setIsCloudConnected(true);
-                alert('Connected to Cloud! (Demo mode)');
-            };
+        function logout() {
+            isAuthenticated = false;
+            currentUser = null;
+            progress = {};
+            currentDay = 1;
+            activities = [
+                { id: 1, name: 'Morning Exercise', icon: '🏃‍♂️', timeOfDay: 'morning' },
+                { id: 2, name: 'Healthy Breakfast', icon: '🍎', timeOfDay: 'morning' },
+                { id: 3, name: 'Read 30 Minutes', icon: '📚', timeOfDay: 'midday' },
+                { id: 4, name: 'Drink Water', icon: '💧', timeOfDay: 'midday' },
+                { id: 5, name: 'Meditate', icon: '🧘‍♀️', timeOfDay: 'evening' },
+                { id: 6, name: 'Journal', icon: '✍️', timeOfDay: 'evening' }
+            ];
+            editMode = false;
+            renderAll();
+        }
 
-            const copyToClipboard = (text) => {
-                navigator.clipboard.writeText(text).then(() => {
-                    alert('SQL code copied to clipboard!');
-                });
-            };
+        function requireAuth() {
+            if (!isAuthenticated) {
+                document.getElementById('demo-message').style.display = 'block';
+                setTimeout(() => {
+                    document.getElementById('demo-message').style.display = 'none';
+                }, 3000);
+                return false;
+            }
+            return true;
+        }
 
-            const toggleSection = (timeOfDay) => {
-                setCollapsedSections(prev => ({
-                    ...prev,
-                    [timeOfDay]: !prev[timeOfDay]
-                }));
-            };
+        // Activity functions
+        function isCompleted(day, activityId) {
+            return progress[day] && progress[day][activityId] || false;
+        }
 
-            // Statistics
-            const getCompletionStats = () => {
-                let totalActivities = 0;
-                let completedActivities = 0;
+        function toggleActivity(day, activityId) {
+            if (!requireAuth()) return;
+            
+            if (!progress[day]) progress[day] = {};
+            progress[day][activityId] = !progress[day][activityId];
+            renderAll();
+        }
+
+        function addActivity() {
+            if (!requireAuth()) return;
+            
+            const name = document.getElementById('new-name').value.trim();
+            if (!name) return;
+            
+            const newId = Math.max(...activities.map(a => a.id), 0) + 1;
+            activities.push({
+                id: newId,
+                name,
+                icon: document.getElementById('new-icon').value,
+                timeOfDay: document.getElementById('new-time').value
+            });
+            
+            document.getElementById('new-name').value = '';
+            renderAll();
+        }
+
+        function deleteActivity(id) {
+            if (!requireAuth()) return;
+            activities = activities.filter(a => a.id !== id);
+            Object.keys(progress).forEach(day => {
+                if (progress[day][id]) delete progress[day][id];
+            });
+            renderAll();
+        }
+
+        function moveActivity(id, direction) {
+            if (!requireAuth()) return;
+            const activity = activities.find(a => a.id === id);
+            const sameTimeActivities = activities.filter(a => a.timeOfDay === activity.timeOfDay);
+            const currentIndex = sameTimeActivities.findIndex(a => a.id === id);
+            
+            if (direction === 'up' && currentIndex > 0) {
+                const activityIndex = activities.findIndex(a => a.id === id);
+                const targetIndex = activities.findIndex(a => a.id === sameTimeActivities[currentIndex - 1].id);
+                [activities[activityIndex], activities[targetIndex]] = [activities[targetIndex], activities[activityIndex]];
+            } else if (direction === 'down' && currentIndex < sameTimeActivities.length - 1) {
+                const activityIndex = activities.findIndex(a => a.id === id);
+                const targetIndex = activities.findIndex(a => a.id === sameTimeActivities[currentIndex + 1].id);
+                [activities[activityIndex], activities[targetIndex]] = [activities[targetIndex], activities[activityIndex]];
+            }
+            
+            renderAll();
+        }
+
+        function moveToSection(id, newTimeOfDay) {
+            if (!requireAuth()) return;
+            const activityIndex = activities.findIndex(a => a.id === id);
+            activities[activityIndex].timeOfDay = newTimeOfDay;
+            renderAll();
+        }
+
+        function toggleSection(timeOfDay) {
+            collapsedSections[timeOfDay] = !collapsedSections[timeOfDay];
+            renderAll();
+        }
+
+        function toggleEditMode() {
+            if (!requireAuth()) return;
+            editMode = !editMode;
+            document.getElementById('edit-btn').textContent = editMode ? '✓ Done' : '⚙️ Edit Activities';
+            document.getElementById('edit-btn').className = editMode 
+                ? 'px-3 py-2 bg-gray-700 text-white rounded-lg transition-colors text-sm font-medium'
+                : 'px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium';
+            document.getElementById('edit-panel').style.display = editMode ? 'block' : 'none';
+            renderAll();
+        }
+
+        // Data management
+        function toggleDataManagement() {
+            const panel = document.getElementById('data-panel');
+            panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+        }
+
+        function setDataMode(mode) {
+            document.getElementById('local-options').style.display = mode === 'local' ? 'block' : 'none';
+            document.getElementById('cloud-options').style.display = mode === 'cloud' ? 'block' : 'none';
+        }
+
+        function exportData() {
+            if (!requireAuth()) return;
+            const data = { activities, progress, currentDay, exportDate: new Date().toISOString() };
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `habit-tracker-${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function importData(event) {
+            if (!requireAuth()) return;
+            const file = event.target.files[0];
+            if (file && file.type === 'application/json') {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const data = JSON.parse(e.target.result);
+                        activities = data.activities || activities;
+                        progress = data.progress || {};
+                        currentDay = data.currentDay || 1;
+                        renderAll();
+                        alert('Data imported successfully!');
+                    } catch (error) {
+                        alert('Error importing data.');
+                    }
+                };
+                reader.readAsText(file);
+            }
+            event.target.value = '';
+        }
+
+        function connectCloud() {
+            alert('Cloud connection demo - would connect to Supabase in production');
+        }
+
+        // Rendering functions
+        function renderAll() {
+            renderHeader();
+            renderStats();
+            renderDayGrid();
+            renderActivities();
+            renderEditPanel();
+        }
+
+        function renderHeader() {
+            document.getElementById('demo-banner').style.display = isAuthenticated ? 'none' : 'block';
+            document.getElementById('auth-buttons').style.display = isAuthenticated ? 'none' : 'flex';
+            document.getElementById('user-buttons').style.display = isAuthenticated ? 'flex' : 'none';
+            document.getElementById('user-welcome').style.display = isAuthenticated ? 'inline' : 'none';
+            if (isAuthenticated && currentUser) {
+                document.getElementById('user-welcome').textContent = `Welcome, ${currentUser.name}!`;
+            }
+        }
+
+        function renderStats() {
+            let totalActivities = activities.length * 40;
+            let completedActivities = 0;
+            let perfectDays = 0;
+
+            for (let day = 1; day <= 40; day++) {
+                let dayComplete = true;
+                for (let activity of activities) {
+                    if (isCompleted(day, activity.id)) {
+                        completedActivities++;
+                    } else {
+                        dayComplete = false;
+                    }
+                }
+                if (dayComplete && activities.length > 0) perfectDays++;
+            }
+
+            document.getElementById('overall-progress').textContent = totalActivities > 0 ? Math.round((completedActivities / totalActivities) * 100) + '%' : '0%';
+            document.getElementById('current-day-stat').textContent = `${currentDay}/40`;
+            document.getElementById('perfect-days').textContent = perfectDays;
+        }
+
+        function renderDayGrid() {
+            const grid = document.getElementById('day-grid');
+            grid.innerHTML = '';
+            
+            for (let day = 1; day <= 40; day++) {
+                const dayProgress = activities.filter(activity => isCompleted(day, activity.id)).length;
+                const totalActivities = activities.length;
+                const completionRate = totalActivities > 0 ? dayProgress / totalActivities : 0;
                 
-                for (let day = 1; day <= 40; day++) {
-                    activities.forEach(activity => {
-                        totalActivities++;
-                        if (isActivityCompleted(day, activity.id)) {
-                            completedActivities++;
-                        }
+                let bgColor = 'bg-gray-100';
+                if (completionRate === 1) bgColor = 'bg-green-500 text-white';
+                else if (completionRate > 0) bgColor = 'bg-yellow-400';
+                
+                const button = document.createElement('button');
+                button.className = `w-10 h-10 rounded-lg font-medium text-sm transition-all card-hover ${bgColor} ${day === currentDay ? 'ring-2 ring-blue-500' : ''}`;
+                button.textContent = day;
+                button.onclick = () => {
+                    if (requireAuth()) {
+                        currentDay = day;
+                        renderAll();
+                    }
+                };
+                grid.appendChild(button);
+            }
+        }
+
+        function renderActivities() {
+            document.getElementById('day-title').textContent = `Day ${currentDay} Activities`;
+            
+            const completed = activities.filter(activity => isCompleted(currentDay, activity.id)).length;
+            document.getElementById('day-progress').textContent = `${completed} / ${activities.length} completed`;
+            
+            const container = document.getElementById('activities-container');
+            container.innerHTML = '';
+            
+            timeOptions.forEach(timeOption => {
+                const sectionActivities = activities.filter(a => a.timeOfDay === timeOption.value);
+                const isCollapsed = collapsedSections[timeOption.value];
+                
+                const section = document.createElement('div');
+                section.className = 'mb-6';
+                
+                const header = document.createElement('div');
+                header.className = 'bg-gray-50 rounded-lg p-4 cursor-pointer mb-3';
+                header.onclick = () => toggleSection(timeOption.value);
+                header.innerHTML = `
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-3">
+                            <span class="text-2xl">${timeOption.icon}</span>
+                            <h3 class="text-lg font-semibold text-gray-800">${timeOption.label}</h3>
+                            <span class="text-sm text-gray-600">(${sectionActivities.length} activities)</span>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <span class="text-sm text-gray-600">${sectionActivities.filter(a => isCompleted(currentDay, a.id)).length} / ${sectionActivities.length} completed</span>
+                            <span class="transform transition-transform ${isCollapsed ? '' : 'rotate-180'}">⌄</span>
+                        </div>
+                    </div>
+                `;
+                
+                section.appendChild(header);
+                
+                if (!isCollapsed) {
+                    const activitiesDiv = document.createElement('div');
+                    activitiesDiv.className = 'space-y-3 ml-4';
+                    
+                    if (sectionActivities.length === 0) {
+                        activitiesDiv.innerHTML = `
+                            <div class="text-gray-500 text-center py-8 border-2 border-dashed border-gray-200 rounded-lg">
+                                No ${timeOption.label.toLowerCase()} activities yet. Add some in edit mode!
+                            </div>
+                        `;
+                    } else {
+                        sectionActivities.forEach(activity => {
+                            const completed = isCompleted(currentDay, activity.id);
+                            const activityDiv = document.createElement('div');
+                            activityDiv.className = `relative p-4 rounded-xl card-hover cursor-pointer border-2 transition-all ${completed ? 'border-green-300 bg-green-50' : 'border-gray-200 bg-white'}`;
+                            activityDiv.onclick = () => !editMode && toggleActivity(currentDay, activity.id);
+                            
+                            activityDiv.innerHTML = `
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center space-x-4">
+                                        <div class="w-12 h-12 bg-gradient-to-r from-blue-400 to-blue-600 rounded-full flex items-center justify-center text-white text-xl">
+                                            ${activity.icon}
+                                        </div>
+                                        <div>
+                                            <h3 class="font-medium text-gray-800">${activity.name}</h3>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center space-x-3">
+                                        ${completed ? 
+                                            '<div class="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-white">✓</div>' :
+                                            '<div class="w-8 h-8 border-2 border-gray-300 rounded-full"></div>'
+                                        }
+                                    </div>
+                                </div>
+                            `;
+                            
+                            activitiesDiv.appendChild(activityDiv);
+                        });
+                    }
+                    
+                    section.appendChild(activitiesDiv);
+                }
+                
+                container.appendChild(section);
+            });
+            
+            // Show celebration if all activities completed
+            const allCompleted = activities.length > 0 && activities.every(activity => isCompleted(currentDay, activity.id));
+            document.getElementById('celebration').style.display = allCompleted && isAuthenticated ? 'block' : 'none';
+        }
+
+        function renderEditPanel() {
+            if (!editMode) return;
+            
+            // Update stats
+            const statsDiv = document.getElementById('activity-stats');
+            statsDiv.innerHTML = `
+                <div class="flex justify-between"><span class="text-gray-600">Total:</span><span class="font-medium">${activities.length}</span></div>
+                <div class="flex justify-between"><span class="text-gray-600">Morning:</span><span class="font-medium">${activities.filter(a => a.timeOfDay === 'morning').length}</span></div>
+                <div class="flex justify-between"><span class="text-gray-600">Mid-day:</span><span class="font-medium">${activities.filter(a => a.timeOfDay === 'midday').length}</span></div>
+                <div class="flex justify-between"><span class="text-gray-600">Evening:</span><span class="font-medium">${activities.filter(a => a.timeOfDay === 'evening').length}</span></div>
+            `;
+            
+            // Update activities list
+            const listDiv = document.getElementById('edit-activities-list');
+            listDiv.innerHTML = '';
+            
+            timeOptions.forEach(timeOption => {
+                const sectionActivities = activities.filter(a => a.timeOfDay === timeOption.value);
+                
+                const timeDiv = document.createElement('div');
+                timeDiv.className = 'mb-6';
+                timeDiv.innerHTML = `
+                    <div class="flex items-center space-x-2 mb-3 pb-2 border-b border-gray-200">
+                        <span class="text-lg">${timeOption.icon}</span>
+                        <h4 class="font-medium text-gray-700">${timeOption.label}</h4>
+                        <span class="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">${sectionActivities.length} activities</span>
+                    </div>
+                `;
+                
+                const activitiesContainer = document.createElement('div');
+                activitiesContainer.className = 'space-y-2';
+                
+                if (sectionActivities.length === 0) {
+                    activitiesContainer.innerHTML = `
+                        <div class="text-center py-8 text-gray-400 border-2 border-dashed border-gray-200 rounded-lg">
+                            <p class="text-sm">No ${timeOption.label.toLowerCase()} activities</p>
+                        </div>
+                    `;
+                } else {
+                    sectionActivities.forEach((activity, index) => {
+                        const activityDiv = document.createElement('div');
+                        activityDiv.className = 'flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg hover:border-gray-300';
+                        activityDiv.innerHTML = `
+                            <div class="flex items-center space-x-3">
+                                <span class="text-xl">${activity.icon}</span>
+                                <span class="font-medium text-gray-800">${activity.name}</span>
+                            </div>
+                            <div class="flex items-center space-x-1">
+                                ${timeOptions.filter(t => t.value !== activity.timeOfDay).map(t => 
+                                    `<button onclick="moveToSection(${activity.id}, '${t.value}')" class="p-1 text-blue-500 hover:bg-blue-50 rounded" title="Move to ${t.label}">${t.icon}</button>`
+                                ).join('')}
+                                <div class="border-l border-gray-200 pl-2 ml-2 flex space-x-1">
+                                    <button onclick="moveActivity(${activity.id}, 'up')" ${index === 0 ? 'disabled' : ''} class="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30">⬆️</button>
+                                    <button onclick="moveActivity(${activity.id}, 'down')" ${index === sectionActivities.length - 1 ? 'disabled' : ''} class="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30">⬇️</button>
+                                    <button onclick="deleteActivity(${activity.id})" class="p-1 text-red-500 hover:bg-red-50 rounded">❌</button>
+                                </div>
+                            </div>
+                        `;
+                        activitiesContainer.appendChild(activityDiv);
                     });
                 }
                 
-                return {
-                    completion: totalActivities > 0 ? Math.round((completedActivities / totalActivities) * 100) : 0,
-                    perfectDays: Array.from({length: 40}, (_, i) => i + 1).filter(day => 
-                        activities.every(activity => isActivityCompleted(day, activity.id))
-                    ).length
-                };
-            };
+                timeDiv.appendChild(activitiesContainer);
+                listDiv.appendChild(timeDiv);
+            });
+        }
 
-            const getCurrentStreak = (activityId) => {
-                let streak = 0;
-                for (let day = currentDay; day >= 1; day--) {
-                    if (isActivityCompleted(day, activityId)) {
-                        streak++;
-                    } else {
-                        break;
-                    }
-                }
-                return streak;
-            };
-
-            const stats = getCompletionStats();
-
-            return (
-                <div className="min-h-screen gradient-bg">
-                    {/* Demo Banner */}
-                    {!isAuthenticated && (
-                        <div className="bg-amber-100 border-b border-amber-200 px-4 py-2 text-center">
-                            <span className="text-amber-800 text-sm font-medium">
-                                🌟 Demo Mode - Create an account for full personalization and progress tracking!
-                            </span>
-                        </div>
-                    )}
-
-                    {/* Header */}
-                    <div className="bg-white shadow-lg">
-                        <div className="max-w-6xl mx-auto px-6 py-4">
-                            <div className="flex justify-between items-center">
-                                <div className="flex items-center space-x-3">
-                                    <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
-                                        <span className="text-white font-bold">H</span>
-                                    </div>
-                                    <h1 className="text-2xl font-bold text-gray-800">40-Day Habit Tracker</h1>
-                                    {isAuthenticated && currentUser && (
-                                        <span className="text-sm text-gray-600">Welcome, {currentUser.name || currentUser.email}!</span>
-                                    )}
-                                </div>
-                                
-                                <div className="flex items-center space-x-2">
-                                    {isAuthenticated ? (
-                                        <>
-                                            {/* Data Management Dropdown */}
-                                            <div className="relative">
-                                                <button
-                                                    onClick={() => setShowDataManagement(!showDataManagement)}
-                                                    className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors text-sm font-medium flex items-center space-x-1"
-                                                >
-                                                    <span>📁 Data Management</span>
-                                                    <span className={`transform transition-transform ${showDataManagement ? 'rotate-180' : ''}`}>⌄</span>
-                                                </button>
-                                                
-                                                {showDataManagement && (
-                                                    <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200 z-50">
-                                                        <div className="p-4">
-                                                            {/* Local Data Management */}
-                                                            <div className="mb-4">
-                                                                <div className="flex items-center space-x-2 mb-2">
-                                                                    <input
-                                                                        type="radio"
-                                                                        id="local"
-                                                                        name="dataMode"
-                                                                        checked={dataMode === 'local'}
-                                                                        onChange={() => setDataMode('local')}
-                                                                        className="text-blue-600"
-                                                                    />
-                                                                    <label htmlFor="local" className="font-medium text-gray-800">Keep Data Local</label>
-                                                                </div>
-                                                                <p className="text-xs text-gray-600 mb-3 ml-6">Store data on your device with backup/restore options</p>
-                                                                
-                                                                {dataMode === 'local' && (
-                                                                    <div className="ml-6 space-y-2">
-                                                                        <button
-                                                                            onClick={exportData}
-                                                                            className="block w-full text-left px-3 py-2 bg-green-50 text-green-700 rounded hover:bg-green-100 transition-colors text-sm"
-                                                                        >
-                                                                            📥 Export Data - Download backup file
-                                                                        </button>
-                                                                        <label className="block w-full text-left px-3 py-2 bg-purple-50 text-purple-700 rounded hover:bg-purple-100 transition-colors text-sm cursor-pointer">
-                                                                            📤 Import Data - Restore from backup file
-                                                                            <input type="file" accept=".json" onChange={importData} className="hidden" />
-                                                                        </label>
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                            
-                                                            {/* Cloud Data Management */}
-                                                            <div>
-                                                                <div className="flex items-center space-x-2 mb-2">
-                                                                    <input
-                                                                        type="radio"
-                                                                        id="cloud"
-                                                                        name="dataMode"
-                                                                        checked={dataMode === 'cloud'}
-                                                                        onChange={() => setDataMode('cloud')}
-                                                                        className="text-blue-600"
-                                                                    />
-                                                                    <label htmlFor="cloud" className="font-medium text-gray-800">Keep Data on Cloud</label>
-                                                                </div>
-                                                                <p className="text-xs text-gray-600 mb-3 ml-6">Sync data across devices using Supabase</p>
-                                                                
-                                                                {dataMode === 'cloud' && (
-                                                                    <div className="ml-6 space-y-3">
-                                                                        <div className="bg-gray-50 p-3 rounded text-xs">
-                                                                            <div className="flex justify-between items-center mb-2">
-                                                                                <span className="font-medium">1. Create Supabase Tables</span>
-                                                                                <button
-                                                                                    onClick={() => copyToClipboard(supabaseSQL)}
-                                                                                    className="px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
-                                                                                >
-                                                                                    Copy SQL
-                                                                                </button>
-                                                                            </div>
-                                                                            <p className="text-gray-600">Copy and run this SQL in your Supabase SQL Editor</p>
-                                                                        </div>
-                                                                        
-                                                                        <div className="space-y-2">
-                                                                            <input
-                                                                                type="url"
-                                                                                placeholder="Supabase Project URL"
-                                                                                value={cloudConfig.url}
-                                                                                onChange={(e) => setCloudConfig({...cloudConfig, url: e.target.value})}
-                                                                                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                                                                            />
-                                                                            <input
-                                                                                type="password"
-                                                                                placeholder="Supabase API Key"
-                                                                                value={cloudConfig.key}
-                                                                                onChange={(e) => setCloudConfig({...cloudConfig, key: e.target.value})}
-                                                                                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                                                                            />
-                                                                            <input
-                                                                                type="text"
-                                                                                placeholder="Your User ID"
-                                                                                value={cloudConfig.userId}
-                                                                                onChange={(e) => setCloudConfig({...cloudConfig, userId: e.target.value})}
-                                                                                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                                                                            />
-                                                                            <button
-                                                                                onClick={connectToCloud}
-                                                                                disabled={!cloudConfig.url || !cloudConfig.key || !cloudConfig.userId}
-                                                                                className="w-full py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-400 text-sm"
-                                                                            >
-                                                                                {isCloudConnected ? '✅ Connected' : 'Connect to Cloud'}
-                                                                            </button>
-                                                                        </div>
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            <button
-                                                onClick={() => setEditMode(!editMode)}
-                                                className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                                                    editMode 
-                                                        ? 'bg-gray-700 text-white' 
-                                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                                }`}
-                                            >
-                                                ⚙️ {editMode ? 'Done' : 'Edit Activities'}
-                                            </button>
-                                            <button
-                                                onClick={handleLogout}
-                                                className="px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors text-sm font-medium"
-                                            >
-                                                🚪 Logout
-                                            </button>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <button
-                                                onClick={() => { setAuthMode('login'); setShowAuthModal(true); }}
-                                                className="px-4 py-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors font-medium"
-                                            >
-                                                Login
-                                            </button>
-                                            <button
-                                                onClick={() => { setAuthMode('register'); setShowAuthModal(true); }}
-                                                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium"
-                                            >
-                                                Register
-                                            </button>
-                                        </>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Demo Message */}
-                    {showDemoMessage && (
-                        <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg p-6 shadow-2xl z-50 border-2 border-purple-200 max-w-sm w-full mx-4">
-                            <div className="text-center">
-                                <div className="text-4xl mb-3">🔒</div>
-                                <h3 className="text-lg font-bold text-gray-800 mb-2">Account Required</h3>
-                                <p className="text-gray-600 mb-4">Having an account will provide a much more customized experience!</p>
-                                <div className="flex space-x-3">
-                                    <button
-                                        onClick={() => { setAuthMode('register'); setShowAuthModal(true); setShowDemoMessage(false); }}
-                                        className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium"
-                                    >
-                                        Register
-                                    </button>
-                                    <button
-                                        onClick={() => { setAuthMode('login'); setShowAuthModal(true); setShowDemoMessage(false); }}
-                                        className="flex-1 px-4 py-2 text-purple-600 border border-purple-300 rounded-lg hover:bg-purple-50 transition-colors font-medium"
-                                    >
-                                        Login
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Auth Modal */}
-                    {showAuthModal && (
-                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                            <div className="bg-white rounded-lg p-6 w-full max-w-md">
-                                <div className="flex justify-between items-center mb-4">
-                                    <h2 className="text-xl font-bold text-gray-800">
-                                        {authMode === 'login' ? 'Welcome Back!' : 'Create Account'}
-                                    </h2>
-                                    <button
-                                        onClick={() => setShowAuthModal(false)}
-                                        className="text-gray-500 hover:text-gray-700 text-xl"
-                                    >
-                                        ×
-                                    </button>
-                                </div>
-                                
-                                <form onSubmit={handleAuth} className="space-y-4">
-                                    {authMode === 'register' && (
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-                                            <input
-                                                type="text"
-                                                value={authForm.name}
-                                                onChange={(e) => setAuthForm({...authForm, name: e.target.value})}
-                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                                                required
-                                            />
-                                        </div>
-                                    )}
-                                    
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                                        <input
-                                            type="email"
-                                            value={authForm.email}
-                                            onChange={(e) => setAuthForm({...authForm, email: e.target.value})}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                                            required
-                                        />
-                                    </div>
-                                    
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-                                        <input
-                                            type="password"
-                                            value={authForm.password}
-                                            onChange={(e) => setAuthForm({...authForm, password: e.target.value})}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                                            required
-                                        />
-                                    </div>
-                                    
-                                    <button
-                                        type="submit"
-                                        className="w-full py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium"
-                                    >
-                                        {authMode === 'login' ? 'Login' : 'Create Account'}
-                                    </button>
-                                </form>
-                                
-                                <div className="mt-4 text-center">
-                                    <button
-                                        onClick={() => setAuthMode(authMode === 'login' ? 'register' : 'login')}
-                                        className="text-purple-600 hover:text-purple-700 text-sm"
-                                    >
-                                        {authMode === 'login' 
-                                            ? "Don't have an account? Register here" 
-                                            : "Already have an account? Login here"
-                                        }
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    <div className="max-w-6xl mx-auto p-6">
-                        {/* Stats Overview */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                            <div className="bg-white rounded-xl shadow-lg p-6 card-hover">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-sm text-gray-600">Overall Progress</p>
-                                        <p className="text-3xl font-bold text-purple-600">{stats.completion}%</p>
-                                    </div>
-                                    <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
-                                        <span className="text-2xl">📊</span>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div className="bg-white rounded-xl shadow-lg p-6 card-hover">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-sm text-gray-600">Current Day</p>
-                                        <p className="text-3xl font-bold text-blue-600">{currentDay}/40</p>
-                                    </div>
-                                    <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                                        <span className="text-2xl">📅</span>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div className="bg-white rounded-xl shadow-lg p-6 card-hover">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-sm text-gray-600">Perfect Days</p>
-                                        <p className="text-3xl font-bold text-green-600">{stats.perfectDays}</p>
-                                    </div>
-                                    <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                                        <span className="text-2xl">🏆</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Activity Management (Edit Mode) - Two Column Layout */}
-                        {editMode && isAuthenticated && (
-                            <div className="bg-white rounded-xl shadow-lg mb-8">
-                                <div className="p-6 border-b border-gray-200">
-                                    <h2 className="text-xl font-bold text-gray-800">Manage Activities</h2>
-                                </div>
-                                
-                                <div className="grid grid-cols-1 lg:grid-cols-5 gap-0 min-h-[600px]">
-                                    {/* Left Panel - Controls */}
-                                    <div className="lg:col-span-2 bg-gray-50 p-6 border-r border-gray-200">
-                                        <div className="lg:sticky lg:top-6 space-y-6">
-                                            {/* Add New Activity */}
-                                            <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
-                                                <h3 className="font-semibold text-gray-800 mb-4 flex items-center">
-                                                    <span className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center text-green-600 mr-2 text-sm">+</span>
-                                                    Add New Activity
-                                                </h3>
-                                                <div className="space-y-3">
-                                                    <div>
-                                                        <label className="block text-sm font-medium text-gray-700 mb-1">Icon</label>
-                                                        <select
-                                                            value={newActivity.icon}
-                                                            onChange={(e) => setNewActivity({...newActivity, icon: e.target.value})}
-                                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
-                                                        >
-                                                            {iconOptions.map(icon => (
-                                                                <option key={icon} value={icon}>{icon} {icon}</option>
-                                                            ))}
-                                                        </select>
-                                                    </div>
-                                                    <div>
-                                                        <label className="block text-sm font-medium text-gray-700 mb-1">Time Period</label>
-                                                        <select
-                                                            value={newActivity.timeOfDay}
-                                                            onChange={(e) => setNewActivity({...newActivity, timeOfDay: e.target.value})}
-                                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
-                                                        >
-                                                            {timeOfDayOptions.map(option => (
-                                                                <option key={option.value} value={option.value}>
-                                                                    {option.icon} {option.label}
-                                                                </option>
-                                                            ))}
-                                                        </select>
-                                                    </div>
-                                                    <div>
-                                                        <label className="block text-sm font-medium text-gray-700 mb-1">Activity Name</label>
-                                                        <input
-                                                            type="text"
-                                                            placeholder="e.g., 10 push-ups, Read for 20 min..."
-                                                            value={newActivity.name}
-                                                            onChange={(e) => setNewActivity({...newActivity, name: e.target.value})}
-                                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
-                                                            onKeyPress={(e) => e.key === 'Enter' && addActivity()}
-                                                        />
-                                                    </div>
-                                                    <button
-                                                        onClick={addActivity}
-                                                        disabled={!newActivity.name.trim()}
-                                                        className="w-full py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
-                                                    >
-                                                        ➕ Add Activity
-                                                    </button>
-                                                </div>
-                                            </div>
-
-                                            {/* Quick Stats */}
-                                            <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
-                                                <h3 className="font-semibold text-gray-800 mb-3 flex items-center">
-                                                    <span className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 mr-2 text-sm">📊</span>
-                                                    Activity Stats
-                                                </h3>
-                                                <div className="space-y-2 text-sm">
-                                                    <div className="flex justify-between">
-                                                        <span className="text-gray-600">Total Activities:</span>
-                                                        <span className="font-medium">{activities.length}</span>
-                                                    </div>
-                                                    <div className="flex justify-between">
-                                                        <span className="text-gray-600">Morning:</span>
-                                                        <span className="font-medium">{getActivitiesByTimeOfDay('morning').length}</span>
-                                                    </div>
-                                                    <div className="flex justify-between">
-                                                        <span className="text-gray-600">Mid-day:</span>
-                                                        <span className="font-medium">{getActivitiesByTimeOfDay('midday').length}</span>
-                                                    </div>
-                                                    <div className="flex justify-between">
-                                                        <span className="text-gray-600">Evening:</span>
-                                                        <span className="font-medium">{getActivitiesByTimeOfDay('evening').length}</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            {/* Quick Tips */}
-                                            <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
-                                                <h3 className="font-semibold text-gray-800 mb-3 flex items-center">
-                                                    <span className="w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center text-amber-600 mr-2 text-sm">💡</span>
-                                                    Pro Tips
-                                                </h3>
-                                                <div className="text-xs text-gray-600 space-y-2">
-                                                    <p>• <strong>Drag & drop</strong> activities between sections</p>
-                                                    <p>• <strong>Start small</strong> - easier habits stick better</p>
-                                                    <p>• <strong>Stack habits</strong> - attach new ones to existing routines</p>
-                                                    <p>• <strong>Be specific</strong> - "Read 20 pages" vs "Read more"</p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Right Panel - Activities List */}
-                                    <div className="lg:col-span-3 p-6">
-                                        <div className="flex items-center justify-between mb-4">
-                                            <h3 className="font-semibold text-gray-800">Your Activities</h3>
-                                            <span className="text-sm text-gray-500">Click to edit • Drag to reorder</span>
-                                        </div>
-
-                                        {timeOfDayOptions.map(timeOption => {
-                                            const sectionActivities = getActivitiesByTimeOfDay(timeOption.value);
-                                            
-                                            return (
-                                                <div key={timeOption.value} className="mb-6">
-                                                    <div className="flex items-center space-x-2 mb-3 pb-2 border-b border-gray-200">
-                                                        <span className="text-lg">{timeOption.icon}</span>
-                                                        <h4 className="font-medium text-gray-700">{timeOption.label}</h4>
-                                                        <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                                                            {sectionActivities.length} {sectionActivities.length === 1 ? 'activity' : 'activities'}
-                                                        </span>
-                                                    </div>
-                                                    
-                                                    <div 
-                                                        className="space-y-2 min-h-[100px] p-3 border-2 border-dashed border-gray-200 rounded-lg"
-                                                        onDragOver={handleDragOver}
-                                                        onDrop={(e) => handleSectionDrop(e, timeOption.value)}
-                                                    >
-                                                        {sectionActivities.length === 0 ? (
-                                                            <div className="text-center py-8 text-gray-400">
-                                                                <div className="text-2xl mb-2">{timeOption.icon}</div>
-                                                                <p className="text-sm">No {timeOption.label.toLowerCase()} activities</p>
-                                                                <p className="text-xs">Drag activities here or add new ones</p>
-                                                            </div>
-                                                        ) : (
-                                                            sectionActivities.map((activity, index) => (
-                                                                <div
-                                                                    key={activity.id}
-                                                                    draggable={true}
-                                                                    onDragStart={(e) => handleDragStart(e, activity)}
-                                                                    onDragOver={handleDragOver}
-                                                                    onDrop={(e) => handleDrop(e, activity)}
-                                                                    className={`
-                                                                        flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg hover:border-gray-300 transition-all cursor-move
-                                                                        ${draggedActivity?.id === activity.id ? 'dragging' : ''}
-                                                                    `}
-                                                                >
-                                                                    <div className="flex items-center space-x-3 flex-1">
-                                                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm ${activity.color}`}>
-                                                                            {activity.icon}
-                                                                        </div>
-                                                                        {editingActivity === activity.id ? (
-                                                                            <div className="flex items-center space-x-2 flex-1">
-                                                                                <select
-                                                                                    value={activity.icon}
-                                                                                    onChange={(e) => {
-                                                                                        setActivities(activities.map(a => 
-                                                                                            a.id === activity.id ? {...a, icon: e.target.value} : a
-                                                                                        ));
-                                                                                    }}
-                                                                                    className="px-2 py-1 border border-gray-300 rounded text-xs"
-                                                                                    onClick={(e) => e.stopPropagation()}
-                                                                                >
-                                                                                    {iconOptions.map(icon => (
-                                                                                        <option key={icon} value={icon}>{icon}</option>
-                                                                                    ))}
-                                                                                </select>
-                                                                                <input
-                                                                                    type="text"
-                                                                                    value={activity.name}
-                                                                                    onChange={(e) => {
-                                                                                        setActivities(activities.map(a => 
-                                                                                            a.id === activity.id ? {...a, name: e.target.value} : a
-                                                                                        ));
-                                                                                    }}
-                                                                                    className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
-                                                                                    onKeyPress={(e) => e.key === 'Enter' && setEditingActivity(null)}
-                                                                                    onClick={(e) => e.stopPropagation()}
-                                                                                    autoFocus
-                                                                                />
-                                                                                <button
-                                                                                    onClick={(e) => { e.stopPropagation(); setEditingActivity(null); }}
-                                                                                    className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs hover:bg-green-200"
-                                                                                >
-                                                                                    ✓
-                                                                                </button>
-                                                                            </div>
-                                                                        ) : (
-                                                                            <div className="flex-1">
-                                                                                <span className="font-medium text-gray-800 text-sm">{activity.name}</span>
-                                                                                <div className="text-xs text-gray-500">#{activity.id} • Drag to reorder</div>
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-                                                                    
-                                                                    {editingActivity !== activity.id && (
-                                                                        <div className="flex items-center space-x-1">
-                                                                            <button
-                                                                                onClick={(e) => { e.stopPropagation(); moveActivity(activity.id, 'up'); }}
-                                                                                disabled={index === 0}
-                                                                                className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30 text-xs"
-                                                                                title="Move up"
-                                                                            >
-                                                                                ⬆️
-                                                                            </button>
-                                                                            <button
-                                                                                onClick={(e) => { e.stopPropagation(); moveActivity(activity.id, 'down'); }}
-                                                                                disabled={index === sectionActivities.length - 1}
-                                                                                className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30 text-xs"
-                                                                                title="Move down"
-                                                                            >
-                                                                                ⬇️
-                                                                            </button>
-                                                                            <button
-                                                                                onClick={(e) => { e.stopPropagation(); setEditingActivity(activity.id); }}
-                                                                                className="p-1 text-blue-500 hover:text-blue-700 text-xs"
-                                                                                title="Edit"
-                                                                            >
-                                                                                ✏️
-                                                                            </button>
-                                                                            <button
-                                                                                onClick={(e) => { e.stopPropagation(); deleteActivity(activity.id); }}
-                                                                                className="p-1 text-red-500 hover:text-red-700 text-xs"
-                                                                                title="Delete"
-                                                                            >
-                                                                                ❌
-                                                                            </button>
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            ))
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Day Selector */}
-                        <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
-                            <h2 className="text-xl font-bold text-gray-800 mb-4">40-Day Journey</h2>
-                            <div className="grid grid-cols-8 gap-2 mb-4">
-                                {Array.from({length: 40}, (_, i) => i + 1).map(day => {
-                                    const dayProgress = activities.filter(activity => 
-                                        isActivityCompleted(day, activity.id)
-                                    ).length;
-                                    const totalActivities = activities.length;
-                                    const completionRate = totalActivities > 0 ? dayProgress / totalActivities : 0;
-                                    
-                                    let bgColor = 'bg-gray-100';
-                                    if (completionRate === 1) bgColor = 'bg-green-500 text-white';
-                                    else if (completionRate > 0) bgColor = 'bg-yellow-400';
-                                    
-                                    return (
-                                        <button
-                                            key={day}
-                                            onClick={() => {
-                                                if (requireAuth()) setCurrentDay(day);
-                                            }}
-                                            className={`
-                                                w-10 h-10 rounded-lg font-medium text-sm transition-all card-hover
-                                                ${day === currentDay ? 'ring-2 ring-blue-500' : ''}
-                                                ${bgColor}
-                                                ${!isAuthenticated ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}
-                                            `}
-                                        >
-                                            {day}
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                            <div className="flex items-center gap-4 text-sm text-gray-600">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-4 h-4 bg-gray-100 rounded"></div>
-                                    <span>Not Started</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <div className="w-4 h-4 bg-yellow-400 rounded"></div>
-                                    <span>In Progress</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <div className="w-4 h-4 bg-green-500 rounded"></div>
-                                    <span>Complete</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Daily Activities - Time-based Sections */}
-                        <div className="bg-white rounded-xl shadow-lg p-6">
-                            <div className="flex items-center justify-between mb-6">
-                                <h2 className="text-2xl font-bold text-gray-800">
-                                    Day {currentDay} Activities
-                                </h2>
-                                <div className="text-sm text-gray-600">
-                                    {activities.filter(activity => isActivityCompleted(currentDay, activity.id)).length} / {activities.length} completed
-                                </div>
-                            </div>
-                            
-                            {timeOfDayOptions.map(timeOption => {
-                                const sectionActivities = getActivitiesByTimeOfDay(timeOption.value);
-                                const isCollapsed = collapsedSections[timeOption.value];
-                                
-                                return (
-                                    <div key={timeOption.value} className="mb-6">
-                                        {/* Section Header */}
-                                        <div 
-                                            className="section-header rounded-lg p-4 cursor-pointer transition-colors hover:bg-gray-100 mb-3"
-                                            onClick={() => toggleSection(timeOption.value)}
-                                            onDragOver={handleDragOver}
-                                            onDrop={(e) => handleSectionDrop(e, timeOption.value)}
-                                        >
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex items-center space-x-3">
-                                                    <span className="text-2xl">{timeOption.icon}</span>
-                                                    <h3 className="text-lg font-semibold text-gray-800">{timeOption.label}</h3>
-                                                    <span className="text-sm text-gray-600">
-                                                        ({sectionActivities.length} {sectionActivities.length === 1 ? 'activity' : 'activities'})
-                                                    </span>
-                                                </div>
-                                                <div className="flex items-center space-x-2">
-                                                    <div className="text-sm text-gray-600">
-                                                        {sectionActivities.filter(activity => isActivityCompleted(currentDay, activity.id)).length} / {sectionActivities.length} completed
-                                                    </div>
-                                                    <span className={`transform transition-transform ${isCollapsed ? '' : 'rotate-180'}`}>
-                                                        ⌄
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        
-                                        {/* Section Activities */}
-                                        {!isCollapsed && (
-                                            <div className="space-y-3 ml-4">
-                                                {sectionActivities.length === 0 ? (
-                                                    <div className="text-gray-500 text-center py-8 border-2 border-dashed border-gray-200 rounded-lg">
-                                                        No {timeOption.label.toLowerCase()} activities yet. Add some in edit mode!
-                                                    </div>
-                                                ) : (
-                                                    sectionActivities.map((activity, index) => {
-                                                        const completed = isActivityCompleted(currentDay, activity.id);
-                                                        const streak = getCurrentStreak(activity.id);
-                                                        
-                                                        return (
-                                                            <div
-                                                                key={activity.id}
-                                                                draggable={editMode && isAuthenticated}
-                                                                onDragStart={(e) => handleDragStart(e, activity)}
-                                                                onDragOver={handleDragOver}
-                                                                onDrop={(e) => handleDrop(e, activity)}
-                                                                className={`
-                                                                    relative p-4 rounded-xl card-hover cursor-pointer border-2 transition-all
-                                                                    ${completed ? 'border-green-300 bg-green-50' : 'border-gray-200 bg-white'}
-                                                                    ${!isAuthenticated ? 'opacity-60' : ''}
-                                                                    ${draggedActivity?.id === activity.id ? 'dragging' : ''}
-                                                                    ${editMode ? 'cursor-move' : ''}
-                                                                `}
-                                                                onClick={() => !editMode && toggleActivity(currentDay, activity.id)}
-                                                            >
-                                                                {!isAuthenticated && (
-                                                                    <div className="absolute inset-0 bg-white bg-opacity-50 blur-overlay rounded-xl"></div>
-                                                                )}
-                                                                
-                                                                <div className="flex items-center justify-between">
-                                                                    <div className="flex items-center space-x-4">
-                                                                        <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white text-xl ${activity.color}`}>
-                                                                            {activity.icon}
-                                                                        </div>
-                                                                        <div>
-                                                                            {editingActivity === activity.id ? (
-                                                                                <div className="flex items-center space-x-2">
-                                                                                    <select
-                                                                                        value={activity.icon}
-                                                                                        onChange={(e) => {
-                                                                                            setActivities(activities.map(a => 
-                                                                                                a.id === activity.id ? {...a, icon: e.target.value} : a
-                                                                                            ));
-                                                                                        }}
-                                                                                        className="px-2 py-1 border border-gray-300 rounded text-sm"
-                                                                                    >
-                                                                                        {iconOptions.map(icon => (
-                                                                                            <option key={icon} value={icon}>{icon}</option>
-                                                                                        ))}
-                                                                                    </select>
-                                                                                    <input
-                                                                                        type="text"
-                                                                                        value={activity.name}
-                                                                                        onChange={(e) => {
-                                                                                            setActivities(activities.map(a => 
-                                                                                                a.id === activity.id ? {...a, name: e.target.value} : a
-                                                                                            ));
-                                                                                        }}
-                                                                                        className="px-2 py-1 border border-gray-300 rounded text-sm"
-                                                                                        onKeyPress={(e) => e.key === 'Enter' && setEditingActivity(null)}
-                                                                                        autoFocus
-                                                                                    />
-                                                                                    <button
-                                                                                        onClick={() => setEditingActivity(null)}
-                                                                                        className="px-2 py-1 bg-green-100 text-green-700 rounded text-sm hover:bg-green-200"
-                                                                                    >
-                                                                                        ✓
-                                                                                    </button>
-                                                                                </div>
-                                                                            ) : (
-                                                                                <>
-                                                                                    <h3 className="font-medium text-gray-800">{activity.name}</h3>
-                                                                                    {streak > 0 && (
-                                                                                        <div className="flex items-center space-x-1 text-sm text-orange-600">
-                                                                                            <span>🔥</span>
-                                                                                            <span>{streak} day streak!</span>
-                                                                                        </div>
-                                                                                    )}
-                                                                                </>
-                                                                            )}
-                                                                        </div>
-                                                                    </div>
-                                                                    
-                                                                    <div className="flex items-center space-x-2">
-                                                                        {editMode && isAuthenticated && editingActivity !== activity.id && (
-                                                                            <div className="flex items-center space-x-1">
-                                                                                <button
-                                                                                    onClick={(e) => { e.stopPropagation(); moveActivity(activity.id, 'up'); }}
-                                                                                    disabled={index === 0}
-                                                                                    className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30"
-                                                                                >
-                                                                                    ⬆️
-                                                                                </button>
-                                                                                <button
-                                                                                    onClick={(e) => { e.stopPropagation(); moveActivity(activity.id, 'down'); }}
-                                                                                    disabled={index === sectionActivities.length - 1}
-                                                                                    className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30"
-                                                                                >
-                                                                                    ⬇️
-                                                                                </button>
-                                                                                <button
-                                                                                    onClick={(e) => { e.stopPropagation(); setEditingActivity(activity.id); }}
-                                                                                    className="p-1 text-blue-500 hover:text-blue-700"
-                                                                                >
-                                                                                    ✏️
-                                                                                </button>
-                                                                                <button
-                                                                                    onClick={(e) => { e.stopPropagation(); deleteActivity(activity.id); }}
-                                                                                    className="p-1 text-red-500 hover:text-red-700"
-                                                                                >
-                                                                                    ❌
-                                                                                </button>
-                                                                            </div>
-                                                                        )}
-                                                                        
-                                                                        {!editMode && (
-                                                                            completed ? (
-                                                                                <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-white bounce-in">
-                                                                                    ✓
-                                                                                </div>
-                                                                            ) : (
-                                                                                <div className="w-8 h-8 border-2 border-gray-300 rounded-full"></div>
-                                                                            )
-                                                                        )}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        );
-                                                    })
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                );
-                            })}
-                            
-                            {/* Completion Celebration */}
-                            {isAuthenticated && activities.every(activity => isActivityCompleted(currentDay, activity.id)) && activities.length > 0 && (
-                                <div className="mt-6 text-center p-4 bg-gradient-to-r from-green-400 to-blue-500 rounded-xl text-white celebration">
-                                    <div className="text-4xl mb-2">🎉</div>
-                                    <h3 className="text-xl font-bold">Day {currentDay} Complete!</h3>
-                                    <p>You're building amazing habits!</p>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            );
-        };
-
-        // Wait for React to load, then render
-        const checkReact = () => {
-            if (typeof React !== 'undefined' && typeof ReactDOM !== 'undefined') {
-                const root = ReactDOM.createRoot(document.getElementById('root'));
-                root.render(React.createElement(HabitTracker));
-            } else {
-                setTimeout(checkReact, 100);
+        // Close dropdowns when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('#data-panel') && !e.target.closest('[onclick*="toggleDataManagement"]')) {
+                document.getElementById('data-panel').style.display = 'none';
             }
-        };
-        
-        checkReact();
+        });
     </script>
 </body>
 </html>
