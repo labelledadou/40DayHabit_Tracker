@@ -326,15 +326,17 @@
                             <div class="space-y-2">
                                 <input id="cloud-url" type="url" placeholder="https://your-project.supabase.co" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all">
                                 <input id="cloud-key" type="password" placeholder="eyJhbGci... (anon key)" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all">
-                                <input id="cloud-user" type="text" placeholder="Your User ID (e.g., john@email.com)" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all">
                             </div>
                             <button id="connect-btn" onclick="connectCloud()" class="w-full py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-700 hover:to-green-800 transition-all duration-200 text-sm font-semibold shadow-lg mt-3">
                                 Connect to Cloud
                             </button>
                         </div>
                         <div class="text-xs text-gray-500 bg-amber-50 p-2 rounded border-l-4 border-amber-400">
-                            <strong>📋 Setup Required:</strong> Create these tables in your Supabase SQL Editor first:
+                            <strong>📋 Setup Required:</strong> Create database tables first, then users register/login automatically!
                             <button onclick="copySupabaseSQL()" class="ml-2 text-amber-600 hover:text-amber-800 underline">Copy SQL</button>
+                        </div>
+                        <div class="text-xs text-blue-500 bg-blue-50 p-2 rounded border-l-4 border-blue-400">
+                            <strong>✨ New:</strong> Users are now automatically managed by Supabase Auth. No more manual user IDs!
                         </div>
                         <button id="disconnect-btn" onclick="disconnectCloud()" class="w-full py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors text-sm font-medium" style="display: none;">
                             Disconnect from Cloud
@@ -405,6 +407,76 @@
 
         document.getElementById('auth-form').addEventListener('submit', function(e) {
             e.preventDefault();
+            handleSupabaseAuth();
+        });
+
+        async function handleSupabaseAuth() {
+            const email = document.getElementById('auth-email').value;
+            const password = document.getElementById('auth-password').value;
+            const name = document.getElementById('auth-name').value;
+
+            // If cloud is connected, use Supabase auth
+            if (supabase) {
+                try {
+                    let authResult;
+                    
+                    if (authMode === 'register') {
+                        // Register with Supabase Auth
+                        authResult = await supabase.auth.signUp({
+                            email: email,
+                            password: password,
+                            options: {
+                                data: {
+                                    full_name: name || email
+                                }
+                            }
+                        });
+                        
+                        if (authResult.error) throw authResult.error;
+                        
+                        if (authResult.data.user) {
+                            alert('Registration successful! Please check your email to confirm your account, then login.');
+                            switchAuthMode(); // Switch to login mode
+                            return;
+                        }
+                    } else {
+                        // Login with Supabase Auth
+                        authResult = await supabase.auth.signInWithPassword({
+                            email: email,
+                            password: password
+                        });
+                        
+                        if (authResult.error) throw authResult.error;
+                        
+                        if (authResult.data.user) {
+                            currentUser = {
+                                id: authResult.data.user.id,
+                                email: authResult.data.user.email,
+                                name: authResult.data.user.user_metadata?.full_name || authResult.data.user.email
+                            };
+                            cloudUserId = authResult.data.user.id; // Use Supabase user ID
+                            isAuthenticated = true;
+                            
+                            // Load user's data from cloud
+                            await loadFromCloud();
+                            
+                            closeAuthModal();
+                            renderAll();
+                            return;
+                        }
+                    }
+                } catch (error) {
+                    console.error('Supabase auth error:', error);
+                    alert(`Authentication error: ${error.message}`);
+                    return;
+                }
+            }
+            
+            // Fallback to local auth if no Supabase connection
+            handleLocalAuth();
+        }
+
+        function handleLocalAuth() {
             const email = document.getElementById('auth-email').value;
             const password = document.getElementById('auth-password').value;
             const name = document.getElementById('auth-name').value;
@@ -437,9 +509,23 @@
             
             closeAuthModal();
             renderAll();
-        });
+        }
 
         function logout() {
+            if (supabase) {
+                // Logout from Supabase
+                supabase.auth.signOut().then(() => {
+                    resetToDefaultState();
+                }).catch(error => {
+                    console.error('Logout error:', error);
+                    resetToDefaultState(); // Logout locally anyway
+                });
+            } else {
+                resetToDefaultState();
+            }
+        }
+
+        function resetToDefaultState() {
             isAuthenticated = false;
             currentUser = null;
             progress = {};
@@ -667,30 +753,57 @@
         function connectCloud() {
             const url = document.getElementById('cloud-url').value.trim();
             const key = document.getElementById('cloud-key').value.trim();
-            const userId = document.getElementById('cloud-user').value.trim();
             
-            if (!url || !key || !userId) {
-                alert('Please fill in all fields (URL, API Key, and User ID)');
+            if (!url || !key) {
+                alert('Please fill in both Project URL and API Key');
                 return;
             }
             
             try {
                 // Initialize Supabase client
                 supabase = window.supabase.createClient(url, key);
-                cloudUserId = userId;
                 isCloudConnected = true;
                 
-                // Test the connection and load existing data
-                loadFromCloud().then(() => {
-                    alert('Connected to Supabase successfully! Your data has been synced.');
-                    renderAll();
-                    toggleDataManagement(); // Close the panel
-                }).catch(error => {
-                    console.error('Error loading data from cloud:', error);
-                    // Still mark as connected since connection works, just no data yet
-                    alert('Connected to Supabase! Ready to sync your data.');
-                    saveToCloud(); // Save current data as initial sync
-                    toggleDataManagement();
+                // Check if user is already authenticated
+                supabase.auth.getSession().then(({ data: { session } }) => {
+                    if (session) {
+                        // User is already logged in
+                        currentUser = {
+                            id: session.user.id,
+                            email: session.user.email,
+                            name: session.user.user_metadata?.full_name || session.user.email
+                        };
+                        cloudUserId = session.user.id;
+                        isAuthenticated = true;
+                        
+                        loadFromCloud().then(() => {
+                            alert('Connected to Supabase successfully! You are already logged in and your data has been synced.');
+                            renderAll();
+                            updateCloudUI();
+                            toggleDataManagement();
+                        });
+                    } else {
+                        // No active session, user needs to login
+                        alert('Connected to Supabase! Now you can register or login with real user accounts. User data will be automatically managed.');
+                        updateCloudUI();
+                        toggleDataManagement();
+                    }
+                });
+                
+                // Listen for auth changes
+                supabase.auth.onAuthStateChange((event, session) => {
+                    if (event === 'SIGNED_IN' && session) {
+                        currentUser = {
+                            id: session.user.id,
+                            email: session.user.email,
+                            name: session.user.user_metadata?.full_name || session.user.email
+                        };
+                        cloudUserId = session.user.id;
+                        isAuthenticated = true;
+                        renderAll();
+                    } else if (event === 'SIGNED_OUT') {
+                        resetToDefaultState();
+                    }
                 });
                 
             } catch (error) {
@@ -705,22 +818,47 @@
             if (!supabase || !isCloudConnected || !cloudUserId) return;
             
             try {
-                // Save activities
-                const { error: activitiesError } = await supabase
+                // Clear existing activities for this user first, then insert new ones
+                const { error: deleteError } = await supabase
                     .from('habit_activities')
-                    .upsert(
-                        activities.map((activity, index) => ({
-                            id: activity.id,
-                            user_id: cloudUserId,
-                            name: activity.name,
-                            color: 'bg-gradient-to-r from-blue-400 to-blue-600', // default color
-                            icon: activity.icon,
-                            time_of_day: activity.timeOfDay,
-                            order_index: index
-                        }))
-                    );
+                    .delete()
+                    .eq('user_id', cloudUserId);
                 
-                if (activitiesError) throw activitiesError;
+                if (deleteError) {
+                    console.error('Error clearing activities:', deleteError);
+                }
+
+                // Insert activities fresh
+                if (activities.length > 0) {
+                    const { error: activitiesError } = await supabase
+                        .from('habit_activities')
+                        .insert(
+                            activities.map((activity, index) => ({
+                                id: activity.id,
+                                user_id: cloudUserId,
+                                name: activity.name,
+                                color: 'bg-gradient-to-r from-blue-400 to-blue-600',
+                                icon: activity.icon,
+                                time_of_day: activity.timeOfDay,
+                                order_index: index
+                            }))
+                        );
+                    
+                    if (activitiesError) {
+                        console.error('Activities error:', activitiesError);
+                        throw activitiesError;
+                    }
+                }
+
+                // Clear existing progress for this user first
+                const { error: deleteProgressError } = await supabase
+                    .from('habit_progress')
+                    .delete()
+                    .eq('user_id', cloudUserId);
+                
+                if (deleteProgressError) {
+                    console.error('Error clearing progress:', deleteProgressError);
+                }
 
                 // Save progress
                 const progressEntries = [];
@@ -740,9 +878,12 @@
                 if (progressEntries.length > 0) {
                     const { error: progressError } = await supabase
                         .from('habit_progress')
-                        .upsert(progressEntries);
+                        .insert(progressEntries);
                     
-                    if (progressError) throw progressError;
+                    if (progressError) {
+                        console.error('Progress error:', progressError);
+                        throw progressError;
+                    }
                 }
 
                 // Save user settings
@@ -753,13 +894,16 @@
                         current_day: currentDay
                     });
                 
-                if (settingsError) throw settingsError;
+                if (settingsError) {
+                    console.error('Settings error:', settingsError);
+                    throw settingsError;
+                }
                 
                 console.log('Data saved to cloud successfully');
                 
             } catch (error) {
-                console.error('Error saving to cloud:', error);
-                alert('Error saving to cloud. Please check your connection.');
+                console.error('Detailed error saving to cloud:', error);
+                alert(`Error saving to cloud: ${error.message || 'Unknown error'}. Check browser console for details.`);
             }
         }
 
@@ -891,9 +1035,15 @@ CREATE TABLE user_settings (
 
             if (isCloudConnected) {
                 cloudStatus.style.display = 'block';
-                cloudForm.style.display = 'none';
-                disconnectBtn.style.display = 'block';
-                cloudStatusText.textContent = `🔗 Connected as ${cloudUserId}`;
+                if (isAuthenticated && currentUser) {
+                    cloudForm.style.display = 'none';
+                    disconnectBtn.style.display = 'block';
+                    cloudStatusText.textContent = `🔗 Connected and logged in as ${currentUser.email}`;
+                } else {
+                    cloudForm.style.display = 'block';
+                    disconnectBtn.style.display = 'block';
+                    cloudStatusText.textContent = '🔗 Connected to Supabase - Register or Login to sync data';
+                }
             } else {
                 cloudStatus.style.display = 'none';
                 cloudForm.style.display = 'block';
