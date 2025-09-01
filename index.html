@@ -19,13 +19,6 @@
             transform: translateY(-2px);
             box-shadow: 0 10px 25px rgba(0,0,0,0.1);
         }
-        .pulse-animation {
-            animation: pulse 2s infinite;
-        }
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.7; }
-        }
         .bounce-in {
             animation: bounceIn 0.6s ease-out;
         }
@@ -45,6 +38,17 @@
         }
         .blur-overlay {
             backdrop-filter: blur(4px);
+        }
+        .dragging {
+            opacity: 0.5;
+            transform: rotate(5deg);
+        }
+        .drag-over {
+            border: 2px dashed #3b82f6;
+            background-color: #eff6ff;
+        }
+        .section-header {
+            background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
         }
     </style>
 </head>
@@ -66,35 +70,39 @@
             const [isAuthenticated, setIsAuthenticated] = useState(false);
             const [currentUser, setCurrentUser] = useState(null);
             const [showAuthModal, setShowAuthModal] = useState(false);
-            const [authMode, setAuthMode] = useState('login'); // 'login' or 'register'
+            const [authMode, setAuthMode] = useState('login');
             const [authForm, setAuthForm] = useState({ email: '', password: '', name: '' });
 
             // App state
             const [currentDay, setCurrentDay] = useState(1);
             const [activities, setActivities] = useState([
-                { id: 1, name: 'Morning Exercise', icon: '🏃‍♂️', color: 'bg-gradient-to-r from-blue-400 to-blue-600' },
-                { id: 2, name: 'Read 30 Minutes', icon: '📚', color: 'bg-gradient-to-r from-green-400 to-green-600' },
-                { id: 3, name: 'Meditate', icon: '🧘‍♀️', color: 'bg-gradient-to-r from-purple-400 to-purple-600' },
-                { id: 4, name: 'Drink 8 Glasses Water', icon: '💧', color: 'bg-gradient-to-r from-cyan-400 to-cyan-600' },
-                { id: 5, name: 'Journal', icon: '✍️', color: 'bg-gradient-to-r from-amber-400 to-amber-600' }
+                { id: 1, name: 'Morning Exercise', icon: '🏃‍♂️', color: 'bg-gradient-to-r from-blue-400 to-blue-600', timeOfDay: 'morning' },
+                { id: 2, name: 'Healthy Breakfast', icon: '🍎', color: 'bg-gradient-to-r from-green-400 to-green-600', timeOfDay: 'morning' },
+                { id: 3, name: 'Read 30 Minutes', icon: '📚', color: 'bg-gradient-to-r from-purple-400 to-purple-600', timeOfDay: 'midday' },
+                { id: 4, name: 'Drink Water', icon: '💧', color: 'bg-gradient-to-r from-cyan-400 to-cyan-600', timeOfDay: 'midday' },
+                { id: 5, name: 'Meditate', icon: '🧘‍♀️', color: 'bg-gradient-to-r from-indigo-400 to-indigo-600', timeOfDay: 'evening' },
+                { id: 6, name: 'Journal', icon: '✍️', color: 'bg-gradient-to-r from-amber-400 to-amber-600', timeOfDay: 'evening' }
             ]);
 
-            // Progress tracking
+            // UI state
             const [progress, setProgress] = useState({});
             const [editMode, setEditMode] = useState(false);
-            const [newActivity, setNewActivity] = useState({ name: '', icon: '✨' });
+            const [newActivity, setNewActivity] = useState({ name: '', icon: '✨', timeOfDay: 'morning' });
             const [editingActivity, setEditingActivity] = useState(null);
             const [showDemoMessage, setShowDemoMessage] = useState(false);
+            const [collapsedSections, setCollapsedSections] = useState({});
+            const [draggedActivity, setDraggedActivity] = useState(null);
+            const [showDataManagement, setShowDataManagement] = useState(false);
+            const [dataMode, setDataMode] = useState('local'); // 'local' or 'cloud'
 
             // Cloud sync
             const [isCloudConnected, setIsCloudConnected] = useState(false);
-            const [showCloudSetup, setShowCloudSetup] = useState(false);
             const [cloudConfig, setCloudConfig] = useState({ url: '', key: '', userId: '' });
 
             // Demo users storage
             const [users, setUsers] = useState([]);
 
-            const iconOptions = ['✨', '🏃‍♂️', '📚', '🧘‍♀️', '💧', '✍️', '🍎', '💪', '🎯', '🌱', '🎵', '🔥', '⭐', '🚀', '💝'];
+            const iconOptions = ['✨', '🏃‍♂️', '📚', '🧘‍♀️', '💧', '✍️', '🍎', '💪', '🎯', '🌱', '🎵', '🔥', '⭐', '🚀', '💝', '☀️', '🌙', '⚡'];
             const colorOptions = [
                 'bg-gradient-to-r from-blue-400 to-blue-600',
                 'bg-gradient-to-r from-green-400 to-green-600',
@@ -106,7 +114,43 @@
                 'bg-gradient-to-r from-indigo-400 to-indigo-600'
             ];
 
-            // Mock authentication
+            const timeOfDayOptions = [
+                { value: 'morning', label: 'Morning', icon: '🌅' },
+                { value: 'midday', label: 'Mid-day', icon: '☀️' },
+                { value: 'evening', label: 'Evening', icon: '🌙' }
+            ];
+
+            const supabaseSQL = `-- Copy and run this SQL in your Supabase SQL Editor
+-- Table for storing your activities
+CREATE TABLE habit_activities (
+  id bigint PRIMARY KEY,
+  user_id text NOT NULL,
+  name text NOT NULL,
+  color text NOT NULL,
+  icon text NOT NULL,
+  time_of_day text NOT NULL,
+  order_index integer NOT NULL,
+  created_at timestamp with time zone DEFAULT now()
+);
+
+-- Table for storing your daily progress
+CREATE TABLE habit_progress (
+  user_id text NOT NULL,
+  day integer NOT NULL,
+  activity_id bigint NOT NULL,
+  completed boolean NOT NULL,
+  updated_at timestamp with time zone DEFAULT now(),
+  PRIMARY KEY (user_id, day, activity_id)
+);
+
+-- Table for your settings
+CREATE TABLE user_settings (
+  user_id text PRIMARY KEY,
+  current_day integer DEFAULT 1,
+  updated_at timestamp with time zone DEFAULT now()
+);`;
+
+            // Authentication functions
             const handleAuth = (e) => {
                 e.preventDefault();
                 if (authMode === 'register') {
@@ -122,7 +166,6 @@
                     setCurrentUser(newUser);
                     setIsAuthenticated(true);
                 } else {
-                    // Login - find existing user
                     const existingUser = users.find(u => u.email === authForm.email);
                     if (existingUser) {
                         setCurrentUser(existingUser);
@@ -145,11 +188,12 @@
                 setProgress({});
                 setCurrentDay(1);
                 setActivities([
-                    { id: 1, name: 'Morning Exercise', icon: '🏃‍♂️', color: 'bg-gradient-to-r from-blue-400 to-blue-600' },
-                    { id: 2, name: 'Read 30 Minutes', icon: '📚', color: 'bg-gradient-to-r from-green-400 to-green-600' },
-                    { id: 3, name: 'Meditate', icon: '🧘‍♀️', color: 'bg-gradient-to-r from-purple-400 to-purple-600' },
-                    { id: 4, name: 'Drink 8 Glasses Water', icon: '💧', color: 'bg-gradient-to-r from-cyan-400 to-cyan-600' },
-                    { id: 5, name: 'Journal', icon: '✍️', color: 'bg-gradient-to-r from-amber-400 to-amber-600' }
+                    { id: 1, name: 'Morning Exercise', icon: '🏃‍♂️', color: 'bg-gradient-to-r from-blue-400 to-blue-600', timeOfDay: 'morning' },
+                    { id: 2, name: 'Healthy Breakfast', icon: '🍎', color: 'bg-gradient-to-r from-green-400 to-green-600', timeOfDay: 'morning' },
+                    { id: 3, name: 'Read 30 Minutes', icon: '📚', color: 'bg-gradient-to-r from-purple-400 to-purple-600', timeOfDay: 'midday' },
+                    { id: 4, name: 'Drink Water', icon: '💧', color: 'bg-gradient-to-r from-cyan-400 to-cyan-600', timeOfDay: 'midday' },
+                    { id: 5, name: 'Meditate', icon: '🧘‍♀️', color: 'bg-gradient-to-r from-indigo-400 to-indigo-600', timeOfDay: 'evening' },
+                    { id: 6, name: 'Journal', icon: '✍️', color: 'bg-gradient-to-r from-amber-400 to-amber-600', timeOfDay: 'evening' }
                 ]);
             };
 
@@ -162,6 +206,7 @@
                 return true;
             };
 
+            // Activity management functions
             const isActivityCompleted = (day, activityId) => {
                 return progress[day]?.[activityId] || false;
             };
@@ -178,37 +223,8 @@
                 }));
             };
 
-            const getCompletionStats = () => {
-                let totalActivities = 0;
-                let completedActivities = 0;
-                
-                for (let day = 1; day <= 40; day++) {
-                    activities.forEach(activity => {
-                        totalActivities++;
-                        if (isActivityCompleted(day, activity.id)) {
-                            completedActivities++;
-                        }
-                    });
-                }
-                
-                return {
-                    completion: totalActivities > 0 ? Math.round((completedActivities / totalActivities) * 100) : 0,
-                    perfectDays: Array.from({length: 40}, (_, i) => i + 1).filter(day => 
-                        activities.every(activity => isActivityCompleted(day, activity.id))
-                    ).length
-                };
-            };
-
-            const getCurrentStreak = (activityId) => {
-                let streak = 0;
-                for (let day = currentDay; day >= 1; day--) {
-                    if (isActivityCompleted(day, activityId)) {
-                        streak++;
-                    } else {
-                        break;
-                    }
-                }
-                return streak;
+            const getActivitiesByTimeOfDay = (timeOfDay) => {
+                return activities.filter(activity => activity.timeOfDay === timeOfDay);
             };
 
             const addActivity = () => {
@@ -220,16 +236,16 @@
                         id: newId,
                         name: newActivity.name.trim(),
                         icon: newActivity.icon,
-                        color: randomColor
+                        color: randomColor,
+                        timeOfDay: newActivity.timeOfDay
                     }]);
-                    setNewActivity({ name: '', icon: '✨' });
+                    setNewActivity({ name: '', icon: '✨', timeOfDay: 'morning' });
                 }
             };
 
             const deleteActivity = (id) => {
                 if (!requireAuth()) return;
                 setActivities(activities.filter(a => a.id !== id));
-                // Clean up progress data for deleted activity
                 const newProgress = { ...progress };
                 Object.keys(newProgress).forEach(day => {
                     if (newProgress[day][id]) {
@@ -241,20 +257,68 @@
 
             const moveActivity = (id, direction) => {
                 if (!requireAuth()) return;
-                const currentIndex = activities.findIndex(a => a.id === id);
+                const activity = activities.find(a => a.id === id);
+                const sameTimeActivities = activities.filter(a => a.timeOfDay === activity.timeOfDay);
+                const currentIndex = sameTimeActivities.findIndex(a => a.id === id);
+                
                 if (direction === 'up' && currentIndex > 0) {
-                    const newActivities = [...activities];
-                    [newActivities[currentIndex], newActivities[currentIndex - 1]] = 
-                    [newActivities[currentIndex - 1], newActivities[currentIndex]];
+                    const targetActivity = sameTimeActivities[currentIndex - 1];
+                    const newActivities = activities.map(a => {
+                        if (a.id === id) return { ...targetActivity, id: a.id, name: a.name, icon: a.icon, color: a.color };
+                        if (a.id === targetActivity.id) return { ...activity, id: a.id, name: a.name, icon: a.icon, color: a.color };
+                        return a;
+                    });
                     setActivities(newActivities);
-                } else if (direction === 'down' && currentIndex < activities.length - 1) {
-                    const newActivities = [...activities];
-                    [newActivities[currentIndex], newActivities[currentIndex + 1]] = 
-                    [newActivities[currentIndex + 1], newActivities[currentIndex]];
+                } else if (direction === 'down' && currentIndex < sameTimeActivities.length - 1) {
+                    const targetActivity = sameTimeActivities[currentIndex + 1];
+                    const newActivities = activities.map(a => {
+                        if (a.id === id) return { ...targetActivity, id: a.id, name: a.name, icon: a.icon, color: a.color };
+                        if (a.id === targetActivity.id) return { ...activity, id: a.id, name: a.name, icon: a.icon, color: a.color };
+                        return a;
+                    });
                     setActivities(newActivities);
                 }
             };
 
+            // Drag and drop functions
+            const handleDragStart = (e, activity) => {
+                setDraggedActivity(activity);
+                e.dataTransfer.effectAllowed = 'move';
+            };
+
+            const handleDragOver = (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+            };
+
+            const handleDrop = (e, targetActivity) => {
+                e.preventDefault();
+                if (!draggedActivity || draggedActivity.id === targetActivity.id) return;
+
+                const newActivities = [...activities];
+                const draggedIndex = newActivities.findIndex(a => a.id === draggedActivity.id);
+                const targetIndex = newActivities.findIndex(a => a.id === targetActivity.id);
+
+                // Remove dragged item and insert at target position
+                const [draggedItem] = newActivities.splice(draggedIndex, 1);
+                newActivities.splice(targetIndex, 0, { ...draggedItem, timeOfDay: targetActivity.timeOfDay });
+
+                setActivities(newActivities);
+                setDraggedActivity(null);
+            };
+
+            const handleSectionDrop = (e, timeOfDay) => {
+                e.preventDefault();
+                if (!draggedActivity) return;
+
+                const newActivities = activities.map(a =>
+                    a.id === draggedActivity.id ? { ...a, timeOfDay } : a
+                );
+                setActivities(newActivities);
+                setDraggedActivity(null);
+            };
+
+            // Data management functions
             const exportData = () => {
                 if (!requireAuth()) return;
                 const data = {
@@ -294,17 +358,62 @@
             };
 
             const connectToCloud = async () => {
-                // Demo connection - would integrate with real Supabase in production
                 setIsCloudConnected(true);
-                setShowCloudSetup(false);
                 alert('Connected to Cloud! (Demo mode)');
+            };
+
+            const copyToClipboard = (text) => {
+                navigator.clipboard.writeText(text).then(() => {
+                    alert('SQL code copied to clipboard!');
+                });
+            };
+
+            const toggleSection = (timeOfDay) => {
+                setCollapsedSections(prev => ({
+                    ...prev,
+                    [timeOfDay]: !prev[timeOfDay]
+                }));
+            };
+
+            // Statistics
+            const getCompletionStats = () => {
+                let totalActivities = 0;
+                let completedActivities = 0;
+                
+                for (let day = 1; day <= 40; day++) {
+                    activities.forEach(activity => {
+                        totalActivities++;
+                        if (isActivityCompleted(day, activity.id)) {
+                            completedActivities++;
+                        }
+                    });
+                }
+                
+                return {
+                    completion: totalActivities > 0 ? Math.round((completedActivities / totalActivities) * 100) : 0,
+                    perfectDays: Array.from({length: 40}, (_, i) => i + 1).filter(day => 
+                        activities.every(activity => isActivityCompleted(day, activity.id))
+                    ).length
+                };
+            };
+
+            const getCurrentStreak = (activityId) => {
+                let streak = 0;
+                for (let day = currentDay; day >= 1; day--) {
+                    if (isActivityCompleted(day, activityId)) {
+                        streak++;
+                    } else {
+                        break;
+                    }
+                }
+                return streak;
             };
 
             const stats = getCompletionStats();
 
             return (
                 <div className="min-h-screen gradient-bg">
-                    {/* Demo Banner for Non-Authenticated Users */}
+                    {/* Demo Banner */}
                     {!isAuthenticated && (
                         <div className="bg-amber-100 border-b border-amber-200 px-4 py-2 text-center">
                             <span className="text-amber-800 text-sm font-medium">
@@ -330,26 +439,118 @@
                                 <div className="flex items-center space-x-2">
                                     {isAuthenticated ? (
                                         <>
-                                            <button
-                                                onClick={() => setShowCloudSetup(true)}
-                                                className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                                                    isCloudConnected 
-                                                        ? 'bg-green-100 text-green-700 hover:bg-green-200' 
-                                                        : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
-                                                }`}
-                                            >
-                                                {isCloudConnected ? '☁️ Connected' : '☁️ Setup'}
-                                            </button>
-                                            <button
-                                                onClick={exportData}
-                                                className="px-3 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors text-sm font-medium"
-                                            >
-                                                📥 Export
-                                            </button>
-                                            <label className="px-3 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors text-sm font-medium cursor-pointer">
-                                                📤 Import
-                                                <input type="file" accept=".json" onChange={importData} className="hidden" />
-                                            </label>
+                                            {/* Data Management Dropdown */}
+                                            <div className="relative">
+                                                <button
+                                                    onClick={() => setShowDataManagement(!showDataManagement)}
+                                                    className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors text-sm font-medium flex items-center space-x-1"
+                                                >
+                                                    <span>📁 Data Management</span>
+                                                    <span className={`transform transition-transform ${showDataManagement ? 'rotate-180' : ''}`}>⌄</span>
+                                                </button>
+                                                
+                                                {showDataManagement && (
+                                                    <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200 z-50">
+                                                        <div className="p-4">
+                                                            {/* Local Data Management */}
+                                                            <div className="mb-4">
+                                                                <div className="flex items-center space-x-2 mb-2">
+                                                                    <input
+                                                                        type="radio"
+                                                                        id="local"
+                                                                        name="dataMode"
+                                                                        checked={dataMode === 'local'}
+                                                                        onChange={() => setDataMode('local')}
+                                                                        className="text-blue-600"
+                                                                    />
+                                                                    <label htmlFor="local" className="font-medium text-gray-800">Keep Data Local</label>
+                                                                </div>
+                                                                <p className="text-xs text-gray-600 mb-3 ml-6">Store data on your device with backup/restore options</p>
+                                                                
+                                                                {dataMode === 'local' && (
+                                                                    <div className="ml-6 space-y-2">
+                                                                        <button
+                                                                            onClick={exportData}
+                                                                            className="block w-full text-left px-3 py-2 bg-green-50 text-green-700 rounded hover:bg-green-100 transition-colors text-sm"
+                                                                        >
+                                                                            📥 Export Data - Download backup file
+                                                                        </button>
+                                                                        <label className="block w-full text-left px-3 py-2 bg-purple-50 text-purple-700 rounded hover:bg-purple-100 transition-colors text-sm cursor-pointer">
+                                                                            📤 Import Data - Restore from backup file
+                                                                            <input type="file" accept=".json" onChange={importData} className="hidden" />
+                                                                        </label>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            
+                                                            {/* Cloud Data Management */}
+                                                            <div>
+                                                                <div className="flex items-center space-x-2 mb-2">
+                                                                    <input
+                                                                        type="radio"
+                                                                        id="cloud"
+                                                                        name="dataMode"
+                                                                        checked={dataMode === 'cloud'}
+                                                                        onChange={() => setDataMode('cloud')}
+                                                                        className="text-blue-600"
+                                                                    />
+                                                                    <label htmlFor="cloud" className="font-medium text-gray-800">Keep Data on Cloud</label>
+                                                                </div>
+                                                                <p className="text-xs text-gray-600 mb-3 ml-6">Sync data across devices using Supabase</p>
+                                                                
+                                                                {dataMode === 'cloud' && (
+                                                                    <div className="ml-6 space-y-3">
+                                                                        <div className="bg-gray-50 p-3 rounded text-xs">
+                                                                            <div className="flex justify-between items-center mb-2">
+                                                                                <span className="font-medium">1. Create Supabase Tables</span>
+                                                                                <button
+                                                                                    onClick={() => copyToClipboard(supabaseSQL)}
+                                                                                    className="px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
+                                                                                >
+                                                                                    Copy SQL
+                                                                                </button>
+                                                                            </div>
+                                                                            <p className="text-gray-600">Copy and run this SQL in your Supabase SQL Editor</p>
+                                                                        </div>
+                                                                        
+                                                                        <div className="space-y-2">
+                                                                            <input
+                                                                                type="url"
+                                                                                placeholder="Supabase Project URL"
+                                                                                value={cloudConfig.url}
+                                                                                onChange={(e) => setCloudConfig({...cloudConfig, url: e.target.value})}
+                                                                                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                                                                            />
+                                                                            <input
+                                                                                type="password"
+                                                                                placeholder="Supabase API Key"
+                                                                                value={cloudConfig.key}
+                                                                                onChange={(e) => setCloudConfig({...cloudConfig, key: e.target.value})}
+                                                                                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                                                                            />
+                                                                            <input
+                                                                                type="text"
+                                                                                placeholder="Your User ID"
+                                                                                value={cloudConfig.userId}
+                                                                                onChange={(e) => setCloudConfig({...cloudConfig, userId: e.target.value})}
+                                                                                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                                                                            />
+                                                                            <button
+                                                                                onClick={connectToCloud}
+                                                                                disabled={!cloudConfig.url || !cloudConfig.key || !cloudConfig.userId}
+                                                                                className="w-full py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-400 text-sm"
+                                                                            >
+                                                                                {isCloudConnected ? '✅ Connected' : 'Connect to Cloud'}
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+
                                             <button
                                                 onClick={() => setEditMode(!editMode)}
                                                 className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
@@ -488,66 +689,6 @@
                         </div>
                     )}
 
-                    {/* Cloud Setup Modal */}
-                    {showCloudSetup && (
-                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                            <div className="bg-white rounded-lg p-6 w-full max-w-md">
-                                <div className="flex justify-between items-center mb-4">
-                                    <h2 className="text-xl font-bold text-gray-800">Cloud Setup</h2>
-                                    <button
-                                        onClick={() => setShowCloudSetup(false)}
-                                        className="text-gray-500 hover:text-gray-700 text-xl"
-                                    >
-                                        ×
-                                    </button>
-                                </div>
-                                
-                                <div className="space-y-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Supabase Project URL</label>
-                                        <input
-                                            type="url"
-                                            value={cloudConfig.url}
-                                            onChange={(e) => setCloudConfig({...cloudConfig, url: e.target.value})}
-                                            placeholder="https://your-project.supabase.co"
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
-                                        />
-                                    </div>
-                                    
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Supabase API Key</label>
-                                        <input
-                                            type="password"
-                                            value={cloudConfig.key}
-                                            onChange={(e) => setCloudConfig({...cloudConfig, key: e.target.value})}
-                                            placeholder="eyJhbGci..."
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
-                                        />
-                                    </div>
-                                    
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Your User ID</label>
-                                        <input
-                                            type="text"
-                                            value={cloudConfig.userId}
-                                            onChange={(e) => setCloudConfig({...cloudConfig, userId: e.target.value})}
-                                            placeholder="your-name or email"
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
-                                        />
-                                    </div>
-                                    
-                                    <button
-                                        onClick={connectToCloud}
-                                        className="w-full py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
-                                        disabled={!cloudConfig.url || !cloudConfig.key || !cloudConfig.userId}
-                                    >
-                                        Connect to Cloud
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
                     <div className="max-w-6xl mx-auto p-6">
                         {/* Stats Overview */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -596,7 +737,7 @@
                                 {/* Add New Activity */}
                                 <div className="border border-gray-200 rounded-lg p-4 mb-4">
                                     <h3 className="font-medium text-gray-700 mb-3">Add New Activity</h3>
-                                    <div className="flex gap-3">
+                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                                         <select
                                             value={newActivity.icon}
                                             onChange={(e) => setNewActivity({...newActivity, icon: e.target.value})}
@@ -606,97 +747,32 @@
                                                 <option key={icon} value={icon}>{icon}</option>
                                             ))}
                                         </select>
+                                        <select
+                                            value={newActivity.timeOfDay}
+                                            onChange={(e) => setNewActivity({...newActivity, timeOfDay: e.target.value})}
+                                            className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                        >
+                                            {timeOfDayOptions.map(option => (
+                                                <option key={option.value} value={option.value}>
+                                                    {option.icon} {option.label}
+                                                </option>
+                                            ))}
+                                        </select>
                                         <input
                                             type="text"
                                             placeholder="Activity name..."
                                             value={newActivity.name}
                                             onChange={(e) => setNewActivity({...newActivity, name: e.target.value})}
-                                            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                            className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
                                             onKeyPress={(e) => e.key === 'Enter' && addActivity()}
                                         />
                                         <button
                                             onClick={addActivity}
                                             className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                                         >
-                                            ➕
+                                            ➕ Add
                                         </button>
                                     </div>
-                                </div>
-                                
-                                {/* Existing Activities */}
-                                <div className="space-y-2">
-                                    {activities.map((activity, index) => (
-                                        <div key={activity.id} className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg">
-                                            <span className="text-xl">{activity.icon}</span>
-                                            {editingActivity === activity.id ? (
-                                                <>
-                                                    <select
-                                                        value={activity.icon}
-                                                        onChange={(e) => {
-                                                            setActivities(activities.map(a => 
-                                                                a.id === activity.id ? {...a, icon: e.target.value} : a
-                                                            ));
-                                                        }}
-                                                        className="px-2 py-1 border border-gray-300 rounded text-sm"
-                                                    >
-                                                        {iconOptions.map(icon => (
-                                                            <option key={icon} value={icon}>{icon}</option>
-                                                        ))}
-                                                    </select>
-                                                    <input
-                                                        type="text"
-                                                        value={activity.name}
-                                                        onChange={(e) => {
-                                                            setActivities(activities.map(a => 
-                                                                a.id === activity.id ? {...a, name: e.target.value} : a
-                                                            ));
-                                                        }}
-                                                        className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
-                                                        onKeyPress={(e) => e.key === 'Enter' && setEditingActivity(null)}
-                                                        autoFocus
-                                                    />
-                                                    <button
-                                                        onClick={() => setEditingActivity(null)}
-                                                        className="px-2 py-1 bg-green-100 text-green-700 rounded text-sm hover:bg-green-200"
-                                                    >
-                                                        ✓
-                                                    </button>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <span className="flex-1 font-medium text-gray-800">{activity.name}</span>
-                                                    <div className="flex items-center gap-1">
-                                                        <button
-                                                            onClick={() => moveActivity(activity.id, 'up')}
-                                                            disabled={index === 0}
-                                                            className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30"
-                                                        >
-                                                            ⬆️
-                                                        </button>
-                                                        <button
-                                                            onClick={() => moveActivity(activity.id, 'down')}
-                                                            disabled={index === activities.length - 1}
-                                                            className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30"
-                                                        >
-                                                            ⬇️
-                                                        </button>
-                                                        <button
-                                                            onClick={() => setEditingActivity(activity.id)}
-                                                            className="p-1 text-blue-500 hover:text-blue-700"
-                                                        >
-                                                            ✏️
-                                                        </button>
-                                                        <button
-                                                            onClick={() => deleteActivity(activity.id)}
-                                                            className="p-1 text-red-500 hover:text-red-700"
-                                                        >
-                                                            ❌
-                                                        </button>
-                                                    </div>
-                                                </>
-                                            )}
-                                        </div>
-                                    ))}
                                 </div>
                             </div>
                         )}
@@ -750,7 +826,7 @@
                             </div>
                         </div>
 
-                        {/* Daily Activities */}
+                        {/* Daily Activities - Time-based Sections */}
                         <div className="bg-white rounded-xl shadow-lg p-6">
                             <div className="flex items-center justify-between mb-6">
                                 <h2 className="text-2xl font-bold text-gray-800">
@@ -761,55 +837,176 @@
                                 </div>
                             </div>
                             
-                            <div className="grid gap-4">
-                                {activities.map(activity => {
-                                    const completed = isActivityCompleted(currentDay, activity.id);
-                                    const streak = getCurrentStreak(activity.id);
-                                    
-                                    return (
-                                        <div
-                                            key={activity.id}
-                                            className={`
-                                                relative p-4 rounded-xl card-hover cursor-pointer border-2 transition-all
-                                                ${completed ? 'border-green-300 bg-green-50' : 'border-gray-200 bg-white'}
-                                                ${!isAuthenticated ? 'opacity-60' : ''}
-                                            `}
-                                            onClick={() => toggleActivity(currentDay, activity.id)}
+                            {timeOfDayOptions.map(timeOption => {
+                                const sectionActivities = getActivitiesByTimeOfDay(timeOption.value);
+                                const isCollapsed = collapsedSections[timeOption.value];
+                                
+                                return (
+                                    <div key={timeOption.value} className="mb-6">
+                                        {/* Section Header */}
+                                        <div 
+                                            className="section-header rounded-lg p-4 cursor-pointer transition-colors hover:bg-gray-100 mb-3"
+                                            onClick={() => toggleSection(timeOption.value)}
+                                            onDragOver={handleDragOver}
+                                            onDrop={(e) => handleSectionDrop(e, timeOption.value)}
                                         >
-                                            {!isAuthenticated && (
-                                                <div className="absolute inset-0 bg-white bg-opacity-50 blur-overlay rounded-xl"></div>
-                                            )}
-                                            
                                             <div className="flex items-center justify-between">
-                                                <div className="flex items-center space-x-4">
-                                                    <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white text-xl ${activity.color}`}>
-                                                        {activity.icon}
-                                                    </div>
-                                                    <div>
-                                                        <h3 className="font-medium text-gray-800">{activity.name}</h3>
-                                                        {streak > 0 && (
-                                                            <div className="flex items-center space-x-1 text-sm text-orange-600">
-                                                                <span>🔥</span>
-                                                                <span>{streak} day streak!</span>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                                
                                                 <div className="flex items-center space-x-3">
-                                                    {completed ? (
-                                                        <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-white bounce-in">
-                                                            ✓
-                                                        </div>
-                                                    ) : (
-                                                        <div className="w-8 h-8 border-2 border-gray-300 rounded-full"></div>
-                                                    )}
+                                                    <span className="text-2xl">{timeOption.icon}</span>
+                                                    <h3 className="text-lg font-semibold text-gray-800">{timeOption.label}</h3>
+                                                    <span className="text-sm text-gray-600">
+                                                        ({sectionActivities.length} {sectionActivities.length === 1 ? 'activity' : 'activities'})
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center space-x-2">
+                                                    <div className="text-sm text-gray-600">
+                                                        {sectionActivities.filter(activity => isActivityCompleted(currentDay, activity.id)).length} / {sectionActivities.length} completed
+                                                    </div>
+                                                    <span className={`transform transition-transform ${isCollapsed ? '' : 'rotate-180'}`}>
+                                                        ⌄
+                                                    </span>
                                                 </div>
                                             </div>
                                         </div>
-                                    );
-                                })}
-                            </div>
+                                        
+                                        {/* Section Activities */}
+                                        {!isCollapsed && (
+                                            <div className="space-y-3 ml-4">
+                                                {sectionActivities.length === 0 ? (
+                                                    <div className="text-gray-500 text-center py-8 border-2 border-dashed border-gray-200 rounded-lg">
+                                                        No {timeOption.label.toLowerCase()} activities yet. Add some in edit mode!
+                                                    </div>
+                                                ) : (
+                                                    sectionActivities.map((activity, index) => {
+                                                        const completed = isActivityCompleted(currentDay, activity.id);
+                                                        const streak = getCurrentStreak(activity.id);
+                                                        
+                                                        return (
+                                                            <div
+                                                                key={activity.id}
+                                                                draggable={editMode && isAuthenticated}
+                                                                onDragStart={(e) => handleDragStart(e, activity)}
+                                                                onDragOver={handleDragOver}
+                                                                onDrop={(e) => handleDrop(e, activity)}
+                                                                className={`
+                                                                    relative p-4 rounded-xl card-hover cursor-pointer border-2 transition-all
+                                                                    ${completed ? 'border-green-300 bg-green-50' : 'border-gray-200 bg-white'}
+                                                                    ${!isAuthenticated ? 'opacity-60' : ''}
+                                                                    ${draggedActivity?.id === activity.id ? 'dragging' : ''}
+                                                                    ${editMode ? 'cursor-move' : ''}
+                                                                `}
+                                                                onClick={() => !editMode && toggleActivity(currentDay, activity.id)}
+                                                            >
+                                                                {!isAuthenticated && (
+                                                                    <div className="absolute inset-0 bg-white bg-opacity-50 blur-overlay rounded-xl"></div>
+                                                                )}
+                                                                
+                                                                <div className="flex items-center justify-between">
+                                                                    <div className="flex items-center space-x-4">
+                                                                        <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white text-xl ${activity.color}`}>
+                                                                            {activity.icon}
+                                                                        </div>
+                                                                        <div>
+                                                                            {editingActivity === activity.id ? (
+                                                                                <div className="flex items-center space-x-2">
+                                                                                    <select
+                                                                                        value={activity.icon}
+                                                                                        onChange={(e) => {
+                                                                                            setActivities(activities.map(a => 
+                                                                                                a.id === activity.id ? {...a, icon: e.target.value} : a
+                                                                                            ));
+                                                                                        }}
+                                                                                        className="px-2 py-1 border border-gray-300 rounded text-sm"
+                                                                                    >
+                                                                                        {iconOptions.map(icon => (
+                                                                                            <option key={icon} value={icon}>{icon}</option>
+                                                                                        ))}
+                                                                                    </select>
+                                                                                    <input
+                                                                                        type="text"
+                                                                                        value={activity.name}
+                                                                                        onChange={(e) => {
+                                                                                            setActivities(activities.map(a => 
+                                                                                                a.id === activity.id ? {...a, name: e.target.value} : a
+                                                                                            ));
+                                                                                        }}
+                                                                                        className="px-2 py-1 border border-gray-300 rounded text-sm"
+                                                                                        onKeyPress={(e) => e.key === 'Enter' && setEditingActivity(null)}
+                                                                                        autoFocus
+                                                                                    />
+                                                                                    <button
+                                                                                        onClick={() => setEditingActivity(null)}
+                                                                                        className="px-2 py-1 bg-green-100 text-green-700 rounded text-sm hover:bg-green-200"
+                                                                                    >
+                                                                                        ✓
+                                                                                    </button>
+                                                                                </div>
+                                                                            ) : (
+                                                                                <>
+                                                                                    <h3 className="font-medium text-gray-800">{activity.name}</h3>
+                                                                                    {streak > 0 && (
+                                                                                        <div className="flex items-center space-x-1 text-sm text-orange-600">
+                                                                                            <span>🔥</span>
+                                                                                            <span>{streak} day streak!</span>
+                                                                                        </div>
+                                                                                    )}
+                                                                                </>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                    
+                                                                    <div className="flex items-center space-x-2">
+                                                                        {editMode && isAuthenticated && editingActivity !== activity.id && (
+                                                                            <div className="flex items-center space-x-1">
+                                                                                <button
+                                                                                    onClick={(e) => { e.stopPropagation(); moveActivity(activity.id, 'up'); }}
+                                                                                    disabled={index === 0}
+                                                                                    className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30"
+                                                                                >
+                                                                                    ⬆️
+                                                                                </button>
+                                                                                <button
+                                                                                    onClick={(e) => { e.stopPropagation(); moveActivity(activity.id, 'down'); }}
+                                                                                    disabled={index === sectionActivities.length - 1}
+                                                                                    className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30"
+                                                                                >
+                                                                                    ⬇️
+                                                                                </button>
+                                                                                <button
+                                                                                    onClick={(e) => { e.stopPropagation(); setEditingActivity(activity.id); }}
+                                                                                    className="p-1 text-blue-500 hover:text-blue-700"
+                                                                                >
+                                                                                    ✏️
+                                                                                </button>
+                                                                                <button
+                                                                                    onClick={(e) => { e.stopPropagation(); deleteActivity(activity.id); }}
+                                                                                    className="p-1 text-red-500 hover:text-red-700"
+                                                                                >
+                                                                                    ❌
+                                                                                </button>
+                                                                            </div>
+                                                                        )}
+                                                                        
+                                                                        {!editMode && (
+                                                                            completed ? (
+                                                                                <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-white bounce-in">
+                                                                                    ✓
+                                                                                </div>
+                                                                            ) : (
+                                                                                <div className="w-8 h-8 border-2 border-gray-300 rounded-full"></div>
+                                                                            )
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
                             
                             {/* Completion Celebration */}
                             {isAuthenticated && activities.every(activity => isActivityCompleted(currentDay, activity.id)) && activities.length > 0 && (
