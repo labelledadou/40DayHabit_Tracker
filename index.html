@@ -262,60 +262,36 @@ CREATE TABLE user_settings (
                 const currentIndex = sameTimeActivities.findIndex(a => a.id === id);
                 
                 if (direction === 'up' && currentIndex > 0) {
+                    const newActivities = [...activities];
+                    const activityIndex = newActivities.findIndex(a => a.id === id);
                     const targetActivity = sameTimeActivities[currentIndex - 1];
-                    const newActivities = activities.map(a => {
-                        if (a.id === id) return { ...targetActivity, id: a.id, name: a.name, icon: a.icon, color: a.color };
-                        if (a.id === targetActivity.id) return { ...activity, id: a.id, name: a.name, icon: a.icon, color: a.color };
-                        return a;
-                    });
+                    const targetIndex = newActivities.findIndex(a => a.id === targetActivity.id);
+                    
+                    // Swap positions
+                    [newActivities[activityIndex], newActivities[targetIndex]] = 
+                    [newActivities[targetIndex], newActivities[activityIndex]];
+                    
                     setActivities(newActivities);
                 } else if (direction === 'down' && currentIndex < sameTimeActivities.length - 1) {
+                    const newActivities = [...activities];
+                    const activityIndex = newActivities.findIndex(a => a.id === id);
                     const targetActivity = sameTimeActivities[currentIndex + 1];
-                    const newActivities = activities.map(a => {
-                        if (a.id === id) return { ...targetActivity, id: a.id, name: a.name, icon: a.icon, color: a.color };
-                        if (a.id === targetActivity.id) return { ...activity, id: a.id, name: a.name, icon: a.icon, color: a.color };
-                        return a;
-                    });
+                    const targetIndex = newActivities.findIndex(a => a.id === targetActivity.id);
+                    
+                    // Swap positions
+                    [newActivities[activityIndex], newActivities[targetIndex]] = 
+                    [newActivities[targetIndex], newActivities[activityIndex]];
+                    
                     setActivities(newActivities);
                 }
             };
 
-            // Drag and drop functions
-            const handleDragStart = (e, activity) => {
-                setDraggedActivity(activity);
-                e.dataTransfer.effectAllowed = 'move';
-            };
-
-            const handleDragOver = (e) => {
-                e.preventDefault();
-                e.dataTransfer.dropEffect = 'move';
-            };
-
-            const handleDrop = (e, targetActivity) => {
-                e.preventDefault();
-                if (!draggedActivity || draggedActivity.id === targetActivity.id) return;
-
-                const newActivities = [...activities];
-                const draggedIndex = newActivities.findIndex(a => a.id === draggedActivity.id);
-                const targetIndex = newActivities.findIndex(a => a.id === targetActivity.id);
-
-                // Remove dragged item and insert at target position
-                const [draggedItem] = newActivities.splice(draggedIndex, 1);
-                newActivities.splice(targetIndex, 0, { ...draggedItem, timeOfDay: targetActivity.timeOfDay });
-
-                setActivities(newActivities);
-                setDraggedActivity(null);
-            };
-
-            const handleSectionDrop = (e, timeOfDay) => {
-                e.preventDefault();
-                if (!draggedActivity) return;
-
+            const moveActivityToSection = (id, newTimeOfDay) => {
+                if (!requireAuth()) return;
                 const newActivities = activities.map(a =>
-                    a.id === draggedActivity.id ? { ...a, timeOfDay } : a
+                    a.id === id ? { ...a, timeOfDay: newTimeOfDay } : a
                 );
                 setActivities(newActivities);
-                setDraggedActivity(null);
             };
 
             // Data management functions
